@@ -1,0 +1,29 @@
+{
+  "name": "ua-auction-monitor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Моніторинг державних аукціонів України (Prozorro.Sale + СЕТАМ) за заданими критеріями — нерухомість і земля.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "collect": "tsx src/cli.ts collect",
+    "collect:prozorro": "tsx src/cli.ts collect --source=prozorro",
+    "collect:setam": "tsx src/cli.ts collect --source=setam",
+    "match": "tsx src/cli.ts match",
+    "dry": "tsx src/cli.ts collect --dry-run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "csv-parse": "^5.5.6",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

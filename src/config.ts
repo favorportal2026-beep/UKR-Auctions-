@@ -1,0 +1,39 @@
+import 'dotenv/config';
+
+function req(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Відсутня змінна оточення: ${name} (див. .env.example)`);
+  return v;
+}
+
+function opt(name: string, fallback = ''): string {
+  return process.env[name] ?? fallback;
+}
+
+export const config = {
+  supabase: {
+    url: req('SUPABASE_URL'),
+    serviceKey: req('SUPABASE_SERVICE_ROLE_KEY'),
+  },
+  prozorro: {
+    apiBase: opt('PROZORRO_API_BASE', 'https://procedure.prozorro.sale/api'),
+    dgfApiBase: opt('PROZORRO_DGF_API_BASE', 'https://dgf-procedure.prozorro.sale/api'),
+    startDate: opt('PROZORRO_START_DATE', '2026-09-01'),
+  },
+  setam: {
+    csvUrl: opt('SETAM_CSV_URL'),
+  },
+  telegram: {
+    botToken: opt('TELEGRAM_BOT_TOKEN'),
+    chatId: opt('TELEGRAM_CHAT_ID'),
+  },
+  collect: {
+    pageLimit: Number(opt('COLLECT_PAGE_LIMIT', '100')),
+    maxPages: Number(opt('COLLECT_MAX_PAGES', '50')),
+  },
+};
+
+/** Конфіг для дій, що не пишуть у БД/Telegram (dry-run) — не вимагає всіх ключів. */
+export function safeConfig() {
+  return config;
+}
