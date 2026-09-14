@@ -86,6 +86,15 @@ create table if not exists sync_state (
   note       text
 );
 
+-- ── Безпека (RLS) ───────────────────────────────────────────
+-- Ці таблиці — лише для бекенду (колектор пише service_role-ключем, який
+-- обходить RLS). Вмикаємо RLS без політик, щоб anon/authenticated НЕ мали
+-- доступу. Для веб-додатка (Фаза 2) додати явні політики під потрібні ролі.
+alter table lots       enable row level security;
+alter table criteria   enable row level security;
+alter table matches    enable row level security;
+alter table sync_state enable row level security;
+
 -- Приклад стартового критерію (можна видалити):
 -- insert into criteria (name, asset_types, regions, price_max, keywords)
 -- values ('Квартири Київ до 2 млн', '{real_estate}', '{Київ}', 2000000, '{квартира}');
