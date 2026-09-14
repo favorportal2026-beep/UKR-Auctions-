@@ -11,9 +11,15 @@ function opt(name: string, fallback = ''): string {
 }
 
 export const config = {
+  // Ліниві геттери: ключі Supabase вимагаються лише при реальному доступі до БД
+  // (див. db()), тому --dry-run працює без них. Пор. safeConfig() нижче.
   supabase: {
-    url: req('SUPABASE_URL'),
-    serviceKey: req('SUPABASE_SERVICE_ROLE_KEY'),
+    get url() {
+      return req('SUPABASE_URL');
+    },
+    get serviceKey() {
+      return req('SUPABASE_SERVICE_ROLE_KEY');
+    },
   },
   prozorro: {
     apiBase: opt('PROZORRO_API_BASE', 'https://procedure.prozorro.sale/api'),
