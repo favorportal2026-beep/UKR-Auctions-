@@ -95,7 +95,11 @@ const SETAM_CATEGORY_MAP: Record<string, AssetType> = {
 export function classifySetam(category: string, title: string): AssetType {
   const key = (category ?? '').trim().toLowerCase();
   if (key in SETAM_CATEGORY_MAP) return SETAM_CATEGORY_MAP[key]!;
-  return classifyAsset(null, [], `${category} ${title}`);
+  // Текстовий fallback лише для «Інше»/порожньої/невідомої категорії. Інші відомі
+  // категорії (Обладнання, Запчастини, авто, телефони…) — не наш профіль, інакше
+  // текст на кшталт «сільськогосподарської техніки» хибно дає land.
+  if (key === '' || key === 'інше') return classifyAsset(null, [], `${category} ${title}`);
+  return 'other';
 }
 
 /** Чи цікавить нас цей актив (нерухомість або земля). */
