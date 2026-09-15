@@ -48,4 +48,6 @@ export interface CollectResult {
   source: LotSource;
   lots: NormalizedLot[];
   nextCursor?: string | null;
+  /** true — більше сторінок немає (остання/єдина). Для пагінації у pipeline. */
+  done?: boolean;
 }

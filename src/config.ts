@@ -24,7 +24,9 @@ export const config = {
   prozorro: {
     apiBase: opt('PROZORRO_API_BASE', 'https://procedure.prozorro.sale/api'),
     dgfApiBase: opt('PROZORRO_DGF_API_BASE', 'https://dgf-procedure.prozorro.sale/api'),
-    startDate: opt('PROZORRO_START_DATE', '2026-09-01'),
+    // Стартова дата першого забору (далі рухається курсор із БД). Для «лише
+    // активні» беремо недавнє вікно; за потреби глибше — задати PROZORRO_START_DATE.
+    startDate: opt('PROZORRO_START_DATE', '2026-08-01'),
   },
   setam: {
     // Дефолт — останній відомий помісячний CSV-ресурс СЕТАМ на data.gov.ua
@@ -41,7 +43,9 @@ export const config = {
   },
   collect: {
     pageLimit: Number(opt('COLLECT_PAGE_LIMIT', '100')),
-    maxPages: Number(opt('COLLECT_MAX_PAGES', '50')),
+    // Стеля сторінок за один запуск (захист від rate limit; реальний обмежувач —
+    // 20-хв таймаут воркфлоу). Досить, щоб тижневий інкремент наздогнав дельту.
+    maxPages: Number(opt('COLLECT_MAX_PAGES', '200')),
   },
 };
 

@@ -1,11 +1,12 @@
 name: collect
 
-# Планувальник збору лотів. MVP: кожні 2 години.
+# Планувальник збору лотів. Щотижня (понеділок 06:00 UTC), щоб не з'їдати
+# спільний ліміт GitHub Actions. Разові дозбори — вручну через "Run workflow".
 # (Google Cloud Scheduler + Cloud Run — шлях масштабування, коли зросте обсяг.)
 on:
   schedule:
-    - cron: '0 */2 * * *'
-  workflow_dispatch: {} # ручний запуск з вкладки Actions
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {} # ручний запуск з вкладки Actions (для backfill/дозбору)
 
 concurrency:
   group: collect

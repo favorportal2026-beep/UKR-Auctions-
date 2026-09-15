@@ -1,3 +1,4 @@
+import { config } from './config.js';
 import type { Collector } from './collectors/base.js';
 import { ProzorroCollector } from './collectors/prozorro.js';
 import { SetamCollector } from './collectors/setam.js';
@@ -25,23 +26,38 @@ export async function runPipeline(opts: { only?: LotSource } = {}): Promise<void
   const criteria = await getActiveCriteria();
   console.log(`[pipeline] активних критеріїв: ${criteria.length}`);
 
+  const { maxPages } = config.collect;
+
   for (const c of collectors) {
-    const cursor = await getCursor(c.source);
-    console.log(`[${c.source}] старт, cursor=${cursor ?? '—'}`);
-    const { lots, nextCursor } = await c.collect(cursor);
-    console.log(`[${c.source}] отримано лотів: ${lots.length}`);
+    let cursor = await getCursor(c.source);
+    console.log(`[${c.source}] старт, cursor=${cursor ?? '—'}, maxPages=${maxPages}`);
 
-    const changed = await upsertLots(lots);
-    console.log(`[${c.source}] нових/змінених: ${changed.length}`);
+    let totalLots = 0;
+    let totalPairs = 0;
+    // Пагінація: докручуємо курсор через кілька сторінок за один запуск,
+    // доки джерело не скаже done або не впремося в maxPages (захист від rate limit).
+    for (let page = 1; page <= maxPages; page++) {
+      const { lots, nextCursor, done } = await c.collect(cursor);
+      // Зберігаємо лише профільні активи (нерухомість/земля) — Prozorro віддає
+      // усе поспіль (авто, щебінь…), а це монітор нерухомості й землі.
+      const tracked = lots.filter((l) => l.asset_type !== 'other');
+      totalLots += tracked.length;
 
-    const pairs: { lot_id: string; criteria_id: string }[] = [];
-    for (const { id, lot } of changed) {
-      for (const cid of matchAll(lot, criteria)) pairs.push({ lot_id: id, criteria_id: cid });
+      const changed = await upsertLots(tracked);
+      const pairs: { lot_id: string; criteria_id: string }[] = [];
+      for (const { id, lot } of changed) {
+        for (const cid of matchAll(lot, criteria)) pairs.push({ lot_id: id, criteria_id: cid });
+      }
+      await insertMatches(pairs);
+      totalPairs += pairs.length;
+
+      if (nextCursor) {
+        await setCursor(c.source, nextCursor);
+        cursor = nextCursor;
+      }
+      if (done || lots.length === 0 || !nextCursor) break;
     }
-    await insertMatches(pairs);
-    console.log(`[${c.source}] нових збігів: ${pairs.length}`);
-
-    if (nextCursor) await setCursor(c.source, nextCursor);
+    console.log(`[${c.source}] всього лотів: ${totalLots}, нових збігів: ${totalPairs}`);
   }
 
   await notifyMatches();
