@@ -1,12 +1,22 @@
 name: collect
 
-# Планувальник збору лотів. Щотижня (понеділок 06:00 UTC), щоб не з'їдати
-# спільний ліміт GitHub Actions. Разові дозбори — вручну через "Run workflow".
+# Планувальник збору лотів.
+#  • Prozorro — ЩОДНЯ 06:00 UTC: короткі приватизаційні/земельні вікна встигаємо
+#    застати в активному статусі (тижневий крок міг би їх пропустити). API легкий.
+#  • СЕТАМ — раз на тиждень (Пн 07:00 UTC): помісячний CSV важкий і оновлюється
+#    рідко, тому щодня його тягнути немає сенсу.
+# Разові дозбори/backfill — вручну через "Run workflow" (можна задати джерело).
 # (Google Cloud Scheduler + Cloud Run — шлях масштабування, коли зросте обсяг.)
 on:
   schedule:
-    - cron: '0 6 * * 1'
-  workflow_dispatch: {} # ручний запуск з вкладки Actions (для backfill/дозбору)
+    - cron: '0 6 * * *' # Prozorro — щодня
+    - cron: '0 7 * * 1' # СЕТАМ — щотижня (понеділок)
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'Джерело: prozorro | setam | (порожньо = усі)'
+        required: false
+        default: ''
 
 concurrency:
   group: collect
@@ -23,7 +33,27 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run collect
+      # Яке джерело збирати: щоденний cron → лише Prozorro; тижневий (Пн) → лише
+      # СЕТАМ; ручний запуск → значення input (порожнє = усі джерела).
+      - name: Визначити джерело
+        id: src
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "${{ github.event.schedule }}" = "0 7 * * 1" ]; then
+              echo "source=setam" >> "$GITHUB_OUTPUT"
+            else
+              echo "source=prozorro" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "source=${{ github.event.inputs.source }}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Збір
+        run: |
+          if [ -n "${{ steps.src.outputs.source }}" ]; then
+            npm run collect -- --source=${{ steps.src.outputs.source }}
+          else
+            npm run collect
+          fi
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
