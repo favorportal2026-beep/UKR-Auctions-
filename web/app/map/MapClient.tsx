@@ -1,14 +1,20 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import type { MapPoint } from './LeafletMap';
+import type { MapPoint } from './MapboxMap';
 
-// Leaflet потребує window — вантажимо лише на клієнті (без SSR).
-const LeafletMap = dynamic(() => import('./LeafletMap'), {
+// Mapbox GL потребує window — вантажимо лише на клієнті (без SSR).
+const MapboxMap = dynamic(() => import('./MapboxMap'), {
   ssr: false,
   loading: () => <div className="map-loading">Завантаження мапи…</div>,
 });
 
-export default function MapClient({ points }: { points: MapPoint[] }) {
-  return <LeafletMap points={points} />;
+export default function MapClient({
+  points,
+  token,
+}: {
+  points: MapPoint[];
+  token: string | null;
+}) {
+  return <MapboxMap points={points} token={token} />;
 }

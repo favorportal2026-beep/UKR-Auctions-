@@ -3,7 +3,8 @@ import type { Criteria, Lot } from '@/lib/types';
 import { money, moneyCompact } from '@/lib/format';
 import { lotPoint } from '@/lib/geo';
 import MapClient from './MapClient';
-import type { MapPoint } from './LeafletMap';
+import type { MapPoint } from './MapboxMap';
+import { getMapboxToken } from '@/lib/mapbox/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,7 +116,7 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
       </div>
 
       <div className="map-box">
-        <MapClient points={points} />
+        <MapClient points={points} token={getMapboxToken()} />
       </div>
     </main>
   );

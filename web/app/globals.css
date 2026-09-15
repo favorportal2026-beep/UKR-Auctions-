@@ -132,14 +132,26 @@ input:focus, select:focus, textarea:focus { outline: 2px solid color-mix(in srgb
 
 .notice { background: color-mix(in srgb, var(--amber) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--amber) 34%, var(--line)); border-radius: 10px; padding: 10px 14px; font-size: 13.5px; margin-bottom: 18px; }
 
-/* map */
-.map-box { height: 72vh; min-height: 420px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-.map-box .leaflet-container { height: 100%; width: 100%; background: var(--surface-2); }
+/* map (Mapbox GL) */
+.map-box { position: relative; height: 72vh; min-height: 420px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.map-box .mapboxgl-canvas { outline: none; }
 .map-loading { display: grid; place-items: center; height: 100%; color: var(--ink-dim); }
-/* маркер-«цінник» */
-.price-pin { background: none; border: 0; }
+
+/* Перемикач базового шару (супутник/схема) */
+.map-style-switch {
+  position: absolute; top: 10px; right: 10px; z-index: 5; display: inline-flex;
+  background: rgba(255,255,255,.92); border: 1px solid var(--line); border-radius: 8px;
+  overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.18);
+}
+.map-style-switch button {
+  border: 0; background: transparent; padding: 6px 12px; font-size: 12.5px; font-weight: 700;
+  color: #333; cursor: pointer;
+}
+.map-style-switch button.active { background: #1f6f4a; color: #fff; }
+
+/* маркер-«цінник» (Mapbox Marker, anchor:bottom — Mapbox сам позиціонує обгортку) */
 .price-tag {
-  position: absolute; transform: translate(-50%, calc(-100% - 7px));
+  position: relative;
   display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
   padding: 4px 9px 4px 7px; border-radius: 9px; font-weight: 800; font-size: 12.5px;
   color: #fff; background: #e8620c; border: 1px solid rgba(0,0,0,.18);
@@ -151,8 +163,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid color-mix(in srgb
 }
 .price-tag.c-realty { background: #e8620c; border-top-color: #e8620c; }
 .price-tag.c-realty::after { border-top-color: #e8620c; }
-.price-tag.c-land { background: #1f8f5a; } .price-tag.c-land::after { border-top-color: #1f8f5a; }
-.price-tag.c-other { background: #6b6a63; } .price-tag.c-other::after { border-top-color: #6b6a63; }
+.price-tag.c-land { background: #1f8f5a; border-top-color: #1f8f5a; } .price-tag.c-land::after { border-top-color: #1f8f5a; }
+.price-tag.c-other { background: #6b6a63; border-top-color: #6b6a63; } .price-tag.c-other::after { border-top-color: #6b6a63; }
 .price-tag.pt-approx { opacity: .82; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
 .pt-badge {
   display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
@@ -165,7 +177,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid color-mix(in srgb
 .map-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .map-legend i { width: 14px; height: 14px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(0,0,0,.2); }
 /* Popup у світлій гамі незалежно від теми (тайли світлі) */
-.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #fff; color: #1a1a17; }
-.leaflet-popup-content a { color: #1f6f4a; }
+.mapboxgl-popup-content { background: #fff; color: #1a1a17; border-radius: 10px; padding: 12px 14px; }
+.mapboxgl-popup-content a { color: #1f6f4a; }
+.mapboxgl-popup-tip { border-top-color: #fff !important; }
 
 .site-footer { border-top: 1px solid var(--line); color: var(--ink-dim); font-size: 12.5px; padding-block: 20px; margin-top: 30px; }
