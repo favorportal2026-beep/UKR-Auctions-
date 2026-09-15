@@ -17,7 +17,15 @@ export function db(): SupabaseClient {
         'Відсутні SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY (див. web/.env.local.example).'
       );
     }
-    _client = createClient(url, key, { auth: { persistSession: false } });
+    _client = createClient(url, key, {
+      auth: { persistSession: false },
+      // Вимикаємо кеш Next.js для запитів у БД — дашборд має показувати живі дані,
+      // інакше сторінка віддає застарілий знімок (force-dynamic сам це не гарантує).
+      global: {
+        fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+          fetch(input, { ...init, cache: 'no-store' }),
+      },
+    });
   }
   return _client;
 }
