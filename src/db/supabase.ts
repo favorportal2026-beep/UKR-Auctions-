@@ -34,7 +34,9 @@ export async function upsertLots(lots: NormalizedLot[]): Promise<{ id: string; l
   const prev = new Map((existing ?? []).map((r) => [r.source_id, r]));
 
   const now = new Date().toISOString();
-  const payload = lots.map((l) => ({
+  // Координати не чіпаємо тут — ними керує геокодер (geocodeMissing), інакше
+  // повторний збір із порожнім lat/lng затер би вже знайдені координати.
+  const payload = lots.map(({ lat, lng, ...l }) => ({
     ...l,
     last_seen: now,
     updated_at: now,
@@ -99,6 +101,38 @@ export async function markNotified(matchIds: string[]): Promise<void> {
   if (matchIds.length === 0) return;
   const { error } = await db().from('matches').update({ notified: true }).in('id', matchIds);
   if (error) throw new Error(`markNotified: ${error.message}`);
+}
+
+/** Лоти без координат (для геокодування): профільні активи, lat is null. */
+export async function lotsMissingCoords(limit: number): Promise<
+  { id: string; source: LotSource; title: string | null; address: string | null; region: string | null }[]
+> {
+  const { data, error } = await db()
+    .from('lots')
+    .select('id, source, title, address, region')
+    .is('lat', null)
+    .neq('asset_type', 'other')
+    .order('updated_at', { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`lotsMissingCoords: ${error.message}`);
+  return (data ?? []) as any;
+}
+
+export async function saveCoords(id: string, lat: number, lng: number): Promise<void> {
+  const { error } = await db().from('lots').update({ lat, lng }).eq('id', id);
+  if (error) throw new Error(`saveCoords: ${error.message}`);
+}
+
+/** Кеш геокодування за текстом запиту (щоб не повторювати й берегти ліміт Nominatim). */
+export async function getGeocodeCache(
+  query: string
+): Promise<{ lat: number | null; lng: number | null } | undefined> {
+  const { data } = await db().from('geocode_cache').select('lat, lng').eq('query', query).maybeSingle();
+  return data ?? undefined;
+}
+
+export async function setGeocodeCache(query: string, lat: number | null, lng: number | null): Promise<void> {
+  await db().from('geocode_cache').upsert({ query, lat, lng }, { onConflict: 'query' });
 }
 
 export async function getCursor(source: LotSource): Promise<string | null> {

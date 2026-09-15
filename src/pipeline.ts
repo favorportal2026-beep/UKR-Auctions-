@@ -3,13 +3,19 @@ import type { Collector } from './collectors/base.js';
 import { ProzorroCollector } from './collectors/prozorro.js';
 import { SetamCollector } from './collectors/setam.js';
 import { matchAll } from './criteria/engine.js';
+import { geocode } from './geo/geocode.js';
+import { buildGeoQuery } from './geo/query.js';
 import {
   getActiveCriteria,
   getCursor,
+  getGeocodeCache,
   getUnnotifiedMatches,
   insertMatches,
+  lotsMissingCoords,
   markNotified,
+  saveCoords,
   setCursor,
+  setGeocodeCache,
   upsertLots,
 } from './db/supabase.js';
 import { formatLot, sendTelegram } from './notify/telegram.js';
@@ -60,7 +66,36 @@ export async function runPipeline(opts: { only?: LotSource } = {}): Promise<void
     console.log(`[${c.source}] всього лотів: ${totalLots}, нових збігів: ${totalPairs}`);
   }
 
+  await geocodeMissing();
   await notifyMatches();
+}
+
+/**
+ * Геокодує лоти без координат (OSM Nominatim), щоб на мапі був точний пін.
+ * Обмежено GEOCODE_MAX_PER_RUN за запуск (політика ≤1 req/s). Кеш за текстом
+ * запиту економить звернення для однакових адрес.
+ */
+export async function geocodeMissing(): Promise<void> {
+  const rows = await lotsMissingCoords(config.geo.maxPerRun);
+  if (rows.length === 0) {
+    console.log('[geo] лотів без координат немає.');
+    return;
+  }
+  let ok = 0;
+  for (const lot of rows) {
+    const q = buildGeoQuery(lot);
+    let coord = await getGeocodeCache(q.freeform);
+    if (coord === undefined) {
+      const r = await geocode(q);
+      coord = { lat: r?.lat ?? null, lng: r?.lng ?? null };
+      await setGeocodeCache(q.freeform, coord.lat, coord.lng);
+    }
+    if (coord.lat != null && coord.lng != null) {
+      await saveCoords(lot.id, coord.lat, coord.lng);
+      ok++;
+    }
+  }
+  console.log(`[geo] геокодовано: ${ok}/${rows.length}`);
 }
 
 /** Розсилає Telegram по незасповіщених збігах. */

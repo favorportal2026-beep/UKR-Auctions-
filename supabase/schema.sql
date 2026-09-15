@@ -91,14 +91,23 @@ create table if not exists sync_state (
   note       text
 );
 
+-- ── Кеш геокодування (адреса → координати) ──────────────────
+create table if not exists geocode_cache (
+  query      text primary key,                    -- нормалізований текст запиту
+  lat        double precision,                    -- null = геокодер не знайшов
+  lng        double precision,
+  created_at timestamptz not null default now()
+);
+
 -- ── Безпека (RLS) ───────────────────────────────────────────
 -- Ці таблиці — лише для бекенду (колектор пише service_role-ключем, який
 -- обходить RLS). Вмикаємо RLS без політик, щоб anon/authenticated НЕ мали
 -- доступу. Для веб-додатка (Фаза 2) додати явні політики під потрібні ролі.
-alter table lots       enable row level security;
-alter table criteria   enable row level security;
-alter table matches    enable row level security;
-alter table sync_state enable row level security;
+alter table lots          enable row level security;
+alter table criteria      enable row level security;
+alter table matches       enable row level security;
+alter table sync_state    enable row level security;
+alter table geocode_cache enable row level security;
 
 -- Приклад стартового критерію (можна видалити):
 -- insert into criteria (name, asset_types, regions, price_max, keywords)
