@@ -111,7 +111,9 @@ export class ProzorroCollector implements Collector {
       nextCursor = d.toISOString();
     }
 
-    return { source: this.source, lots, nextCursor };
+    // остання сторінка, якщо повернулось менше за ліміт або курсор не зрушив
+    const done = rows.length < config.collect.pageLimit || nextCursor === cursor;
+    return { source: this.source, lots, nextCursor, done };
   }
 
   private normalize(a: any): NormalizedLot | null {

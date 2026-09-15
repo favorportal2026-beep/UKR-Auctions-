@@ -107,7 +107,7 @@ export class SetamCollector implements Collector {
   async collect(_cursor: string | null): Promise<CollectResult> {
     if (!this.csvUrl) {
       console.warn('[setam] SETAM_CSV_URL не задано — пропускаю. Див. CLAUDE.md.');
-      return { source: this.source, lots: [], nextCursor: _cursor };
+      return { source: this.source, lots: [], nextCursor: _cursor, done: true };
     }
 
     const csv = await fetchText(this.csvUrl);
@@ -118,7 +118,7 @@ export class SetamCollector implements Collector {
       bom: true,
     }) as Row[];
 
-    if (rows.length === 0) return { source: this.source, lots: [], nextCursor: _cursor };
+    if (rows.length === 0) return { source: this.source, lots: [], nextCursor: _cursor, done: true };
 
     const headers = Object.keys(rows[0]!);
     const col = resolveColumns(headers);
@@ -166,7 +166,7 @@ export class SetamCollector implements Collector {
       });
     }
 
-    // СЕТАМ віддає повний CSV — курсор не потрібен (дедуп робить БД).
-    return { source: this.source, lots, nextCursor: new Date().toISOString() };
+    // СЕТАМ віддає повний CSV за один раз — пагінації немає (done=true).
+    return { source: this.source, lots, nextCursor: new Date().toISOString(), done: true };
   }
 }
