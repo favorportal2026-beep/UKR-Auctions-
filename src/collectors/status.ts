@@ -25,3 +25,16 @@ export function isActiveStatus(source: LotSource, status: string | null | undefi
   if (source === 'setam') return SETAM_ACTIVE.has(s);
   return true;
 }
+
+/**
+ * Чи це продаж/приватизація (а не ОРЕНДА). Монітор відстежує лише продаж:
+ * landSell/landArrested, *Sell, приватизація, банкрутство, СЕТАМ тощо.
+ * Оренду виключаємо — у Prozorro це методи з «Lease»/«Rental» у назві
+ * (landRental-*, commercialPropertyLease-*, legitimatePropertyLease-*,
+ * regulationsPropertyLease-*). СЕТАМ — завжди примусовий продаж.
+ */
+export function isSaleMethod(sellingMethod: string | null | undefined): boolean {
+  const m = (sellingMethod ?? '').toLowerCase();
+  if (!m) return true; // невідомий метод не відкидаємо (страховка)
+  return !m.includes('lease') && !m.includes('rental');
+}
