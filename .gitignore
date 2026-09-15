@@ -6,3 +6,8 @@ dist/
 .DS_Store
 /tmp/
 coverage/
+
+# Next.js (web/)
+.next/
+web/.next/
+next-env.d.ts
