@@ -1,6 +1,6 @@
 'use client';
 
-import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import { LayersControl, MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -10,42 +10,65 @@ export type MapPoint = {
   lng: number;
   title: string;
   priceLabel: string;
+  pill: string;
+  source: string;
   region: string | null;
   asset: string;
   url: string | null;
   approx: boolean;
 };
 
-function dotIcon(asset: string) {
-  const color = asset === 'land' ? '#2f9e6a' : asset === 'real_estate' ? '#2b5c9b' : '#8a8a80';
+// Маркер-«цінник» (як у референсі): плашка з ціною + хвостик + бейдж джерела.
+function priceIcon(p: MapPoint) {
+  const cls = p.asset === 'land' ? 'c-land' : p.asset === 'real_estate' ? 'c-realty' : 'c-other';
+  const badge = p.source === 'prozorro' ? 'P' : 'С';
+  const dim = p.approx ? ' pt-approx' : '';
   return L.divIcon({
-    className: 'lot-pin',
-    html: `<span style="background:${color}"></span>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-    popupAnchor: [0, -8],
+    className: 'price-pin',
+    html:
+      `<div class="price-tag ${cls}${dim}">` +
+      `<span class="pt-badge">${badge}</span>` +
+      `<span class="pt-price">${p.pill}</span>` +
+      `</div>`,
   });
 }
+
+const ESRI_IMAGERY =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const ESRI_LABELS =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 
 export default function LeafletMap({ points }: { points: MapPoint[] }) {
   return (
     <MapContainer center={[48.8, 31.2]} zoom={6} scrollWheelZoom style={{ height: '100%', width: '100%' }}>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        maxZoom={19}
-      />
+      <LayersControl position="topright">
+        <LayersControl.BaseLayer checked name="Супутник">
+          <TileLayer url={ESRI_IMAGERY} attribution="Tiles &copy; Esri, Maxar, Earthstar Geographics" maxZoom={19} />
+        </LayersControl.BaseLayer>
+        <LayersControl.BaseLayer name="Схема (OSM)">
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            maxZoom={19}
+          />
+        </LayersControl.BaseLayer>
+        <LayersControl.Overlay checked name="Підписи (вулиці/міста)">
+          <TileLayer url={ESRI_LABELS} maxZoom={19} />
+        </LayersControl.Overlay>
+      </LayersControl>
+
       {points.map((p) => (
-        <Marker key={p.id} position={[p.lat, p.lng]} icon={dotIcon(p.asset)}>
+        <Marker key={p.id} position={[p.lat, p.lng]} icon={priceIcon(p)}>
           <Popup>
-            <div style={{ minWidth: 180 }}>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>{p.priceLabel}</div>
+            <div style={{ minWidth: 190 }}>
+              <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>{p.priceLabel}</div>
               <div style={{ fontSize: 13, lineHeight: 1.35, marginBottom: 6 }}>{p.title}</div>
               <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>
-                {p.region ?? '—'}{p.approx ? ' · орієнтовно (центр області)' : ''}
+                {p.region ?? '—'}
+                {p.approx ? ' · орієнтовно (центр області)' : ''}
               </div>
               {p.url ? (
-                <a href={p.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600 }}>
+                <a href={p.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 700 }}>
                   Відкрити лот ↗
                 </a>
               ) : null}

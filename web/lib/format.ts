@@ -13,6 +13,14 @@ export function money(v: number | null, currency = 'UAH'): string {
   }
 }
 
+/** Компактна ціна для маркера: ₴96k, ₴2.4M. */
+export function moneyCompact(v: number | null): string {
+  if (v == null) return '₴—';
+  if (v >= 1_000_000) return '₴' + (v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1).replace(/\.0$/, '') + 'M';
+  if (v >= 1_000) return '₴' + Math.round(v / 1_000) + 'k';
+  return '₴' + Math.round(v);
+}
+
 export function area(v: number | null): string {
   if (v == null) return '—';
   if (v >= 10_000) return `${(v / 10_000).toLocaleString('uk-UA', { maximumFractionDigits: 2 })} га`;
