@@ -15,6 +15,8 @@ export interface Lot {
   status: string | null;
   region: string | null;
   address: string | null;
+  lat: number | null;
+  lng: number | null;
   area_sqm: number | null;
   start_price: number | null;
   current_price: number | null;
