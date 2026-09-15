@@ -41,6 +41,12 @@ export const config = {
     botToken: opt('TELEGRAM_BOT_TOKEN'),
     chatId: opt('TELEGRAM_CHAT_ID'),
   },
+  geo: {
+    // Сервер геокодування (OSM Nominatim). Можна замінити на власний інстанс.
+    nominatimBase: opt('NOMINATIM_BASE', 'https://nominatim.openstreetmap.org'),
+    // Скільки лотів геокодувати за один запуск (≤1 req/s → ~2с/лот).
+    maxPerRun: Number(opt('GEOCODE_MAX_PER_RUN', '120')),
+  },
   collect: {
     pageLimit: Number(opt('COLLECT_PAGE_LIMIT', '100')),
     // Стеля сторінок за один запуск (захист від rate limit; реальний обмежувач —
