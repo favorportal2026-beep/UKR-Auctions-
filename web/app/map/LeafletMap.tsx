@@ -1,8 +1,11 @@
 'use client';
 
 import { LayersControl, MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
 export type MapPoint = {
   id: string;
@@ -57,25 +60,27 @@ export default function LeafletMap({ points }: { points: MapPoint[] }) {
         </LayersControl.Overlay>
       </LayersControl>
 
-      {points.map((p) => (
-        <Marker key={p.id} position={[p.lat, p.lng]} icon={priceIcon(p)}>
-          <Popup>
-            <div style={{ minWidth: 190 }}>
-              <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>{p.priceLabel}</div>
-              <div style={{ fontSize: 13, lineHeight: 1.35, marginBottom: 6 }}>{p.title}</div>
-              <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>
-                {p.region ?? '—'}
-                {p.approx ? ' · орієнтовно (центр області)' : ''}
+      <MarkerClusterGroup chunkedLoading maxClusterRadius={48} spiderfyOnMaxZoom showCoverageOnHover={false}>
+        {points.map((p) => (
+          <Marker key={p.id} position={[p.lat, p.lng]} icon={priceIcon(p)}>
+            <Popup>
+              <div style={{ minWidth: 190 }}>
+                <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>{p.priceLabel}</div>
+                <div style={{ fontSize: 13, lineHeight: 1.35, marginBottom: 6 }}>{p.title}</div>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>
+                  {p.region ?? '—'}
+                  {p.approx ? ' · орієнтовно (центр області)' : ''}
+                </div>
+                {p.url ? (
+                  <a href={p.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 700 }}>
+                    Відкрити лот ↗
+                  </a>
+                ) : null}
               </div>
-              {p.url ? (
-                <a href={p.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 700 }}>
-                  Відкрити лот ↗
-                </a>
-              ) : null}
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+            </Popup>
+          </Marker>
+        ))}
+      </MarkerClusterGroup>
     </MapContainer>
   );
 }

@@ -20,7 +20,7 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
   const needInner = matchedOnly || !!crit;
   const selectStr = needInner ? '*, matches!inner(criteria_id)' : '*';
 
-  let query = sb.from('lots').select(selectStr).eq('hidden', false).limit(1000);
+  let query = sb.from('lots').select(selectStr).eq('hidden', false).limit(2000);
   if (source) query = query.eq('source', source);
   if (asset) query = query.eq('asset_type', asset);
   if (region) query = query.ilike('region', `%${region}%`);
