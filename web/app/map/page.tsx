@@ -1,6 +1,6 @@
 import { db } from '@/lib/supabase';
 import type { Criteria, Lot } from '@/lib/types';
-import { money } from '@/lib/format';
+import { money, moneyCompact } from '@/lib/format';
 import { lotPoint } from '@/lib/geo';
 import MapClient from './MapClient';
 import type { MapPoint } from './LeafletMap';
@@ -44,12 +44,15 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
     seen.add(l.id);
     const pt = lotPoint(l);
     if (!pt) { noGeo++; continue; }
+    const price = l.current_price ?? l.start_price;
     points.push({
       id: l.id,
       lat: pt[0],
       lng: pt[1],
       title: l.title ?? 'Без назви',
-      priceLabel: money(l.current_price ?? l.start_price, l.currency ?? 'UAH'),
+      priceLabel: money(price, l.currency ?? 'UAH'),
+      pill: moneyCompact(price),
+      source: l.source,
       region: l.region,
       asset: l.asset_type,
       url: l.lot_url,
@@ -106,9 +109,9 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
       </form>
 
       <div className="map-legend">
-        <span><i style={{ background: '#2f9e6a' }} /> земля</span>
-        <span><i style={{ background: '#2b5c9b' }} /> нерухомість</span>
-        <span className="muted">маркер — центр області (точних координат у джерелах немає)</span>
+        <span><i style={{ background: '#e8620c' }} /> нерухомість</span>
+        <span><i style={{ background: '#1f8f5a' }} /> земля</span>
+        <span className="muted">бейдж: P — Prozorro, С — СЕТАМ · бліда плашка = орієнтовно (центр області)</span>
       </div>
 
       <div className="map-box">
