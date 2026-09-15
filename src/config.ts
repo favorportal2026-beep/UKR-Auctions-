@@ -47,8 +47,9 @@ export const config = {
   geo: {
     // Сервер геокодування (OSM Nominatim). Можна замінити на власний інстанс.
     nominatimBase: opt('NOMINATIM_BASE', 'https://nominatim.openstreetmap.org'),
-    // Скільки лотів геокодувати за один запуск (≤1 req/s → ~2с/лот).
-    maxPerRun: Number(opt('GEOCODE_MAX_PER_RUN', '120')),
+    // Скільки лотів геокодувати за один запуск (≤1 req/s → ~1.5с/лот).
+    // ~400 вкладається у 30-хв воркфлоу; повний backfill — за кілька запусків.
+    maxPerRun: Number(opt('GEOCODE_MAX_PER_RUN', '400')),
   },
   collect: {
     pageLimit: Number(opt('COLLECT_PAGE_LIMIT', '100')),
