@@ -7,7 +7,10 @@ function req(name: string): string {
 }
 
 function opt(name: string, fallback = ''): string {
-  return process.env[name] ?? fallback;
+  // GitHub Actions передає ПОРОЖНІ рядки для незаданих секретів, тому порожнє
+  // трактуємо як відсутнє (інакше fallback не спрацював би: '' ?? x === '').
+  const v = process.env[name];
+  return v == null || v === '' ? fallback : v;
 }
 
 export const config = {
