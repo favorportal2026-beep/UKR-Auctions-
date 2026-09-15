@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Моніторинг державних аукціонів України (Prozorro.Sale + СЕТАМ) за заданими критеріями — нерухомість і земля.",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
