@@ -2,6 +2,7 @@ import { config } from './config.js';
 import type { Collector } from './collectors/base.js';
 import { ProzorroCollector } from './collectors/prozorro.js';
 import { SetamCollector } from './collectors/setam.js';
+import { isActiveStatus } from './collectors/status.js';
 import { matchAll } from './criteria/engine.js';
 import { geocode } from './geo/geocode.js';
 import { buildGeoQuery } from './geo/query.js';
@@ -44,9 +45,11 @@ export async function runPipeline(opts: { only?: LotSource } = {}): Promise<void
     // доки джерело не скаже done або не впремося в maxPages (захист від rate limit).
     for (let page = 1; page <= maxPages; page++) {
       const { lots, nextCursor, done } = await c.collect(cursor);
-      // Зберігаємо лише профільні активи (нерухомість/земля) — Prozorro віддає
-      // усе поспіль (авто, щебінь…), а це монітор нерухомості й землі.
-      const tracked = lots.filter((l) => l.asset_type !== 'other');
+      // Зберігаємо лише профільні активи (нерухомість/земля) І лише активні
+      // аукціони (на які ще можна заявитись) — не завершені/скасовані.
+      const tracked = lots.filter(
+        (l) => l.asset_type !== 'other' && isActiveStatus(l.source, l.status)
+      );
       totalLots += tracked.length;
 
       const changed = await upsertLots(tracked);
