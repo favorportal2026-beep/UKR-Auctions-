@@ -35,6 +35,7 @@ create table if not exists lots (
   valuation      numeric,                         -- оціночна вартість (де є)
   auction_start  timestamptz,                     -- дата/час аукціону
   bids_end       timestamptz,                     -- дедлайн подачі заяв
+  hidden         boolean not null default false,  -- курація: прибрано у веб-дашборді
   raw            jsonb,                           -- сирий об'єкт джерела
   first_seen     timestamptz not null default now(),
   last_seen      timestamptz not null default now(),
@@ -47,6 +48,10 @@ create index if not exists idx_lots_region       on lots (region);
 create index if not exists idx_lots_status       on lots (status);
 create index if not exists idx_lots_bids_end     on lots (bids_end);
 create index if not exists idx_lots_updated_at   on lots (updated_at desc);
+create index if not exists idx_lots_hidden       on lots (hidden);
+
+-- Для наявних БД (де таблиця вже створена без hidden):
+alter table lots add column if not exists hidden boolean not null default false;
 
 -- ── Критерії (збережені пошуки) ─────────────────────────────
 create table if not exists criteria (
@@ -85,6 +90,15 @@ create table if not exists sync_state (
   last_run   timestamptz,
   note       text
 );
+
+-- ── Безпека (RLS) ───────────────────────────────────────────
+-- Ці таблиці — лише для бекенду (колектор пише service_role-ключем, який
+-- обходить RLS). Вмикаємо RLS без політик, щоб anon/authenticated НЕ мали
+-- доступу. Для веб-додатка (Фаза 2) додати явні політики під потрібні ролі.
+alter table lots       enable row level security;
+alter table criteria   enable row level security;
+alter table matches    enable row level security;
+alter table sync_state enable row level security;
 
 -- Приклад стартового критерію (можна видалити):
 -- insert into criteria (name, asset_types, regions, price_max, keywords)

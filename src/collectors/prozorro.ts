@@ -7,13 +7,29 @@ import { classifyAsset } from './classify.js';
  * Колектор Prozorro.Sale (ЦБД-New, відкрите API).
  *
  * Курсор: dateModified. Ендпоінт віддає повні процедури, відсортовані за
- * датою зміни; для наступної сторінки беремо останній dateModified + 1мс.
+ * датою зміни ЗА ЗРОСТАННЯМ; для наступної сторінки беремо останній
+ * dateModified + 1мс.
  *   GET {apiBase}/search/byDateModified/{ISOdate}?limit=100
  *
- * Envelope OpenProcurement: { data: [...], next_page?: {...} } — читаємо захищено.
- *
- * ⚠️ Мапінг полів (value, items, classification, auctionPeriod, address)
- * звірити на першому реальному запуску — див. CLAUDE.md. Усе через optional chaining.
+ * ⚠️ Мапінг полів ЗВІРЕНО на реальних відповідях API (див. CLAUDE.md):
+ *  - Відповідь — це ГОЛИЙ JSON-масив процедур `[ {...}, ... ]`
+ *    (а не OpenProcurement-конверт `{ data, next_page }`). Читаємо захищено
+ *    для обох форматів на випадок legacy-інстансів.
+ *  - Рядкові поля локалізовані: `{ "uk_UA": "..." }` (title, description,
+ *    address.*, unit.name, classification.description, sellingEntity.name) —
+ *    дістаємо через loc().
+ *  - Ідентифікатор: `auctionId` (напр. "LAE001-UA-20260803-09138").
+ *  - Ціна: `value.amount` (стартова), валюта `value.currency`.
+ *  - Оцінка: `expertMonetaryValuation.amount` (експертна/ринкова) або, як
+ *    fallback, `normativeMonetaryValuation.amount` (нормативна). Поля `valuation`
+ *    в API немає.
+ *  - Класифікація: CAV у `items[].classification.id` (+ additionalClassifications).
+ *  - Адреса активу: `items[].address` (region/locality/streetAddress —
+ *    локалізовані); fallback — `sellingEntity.address` (це орган, що продає).
+ *  - Площа: `items[].quantity` + `items[].unit.code` (HAR=гектар→×10000 м²,
+ *    MTK=м²). Інші одиниці (TNE/H87/LO…) площею не вважаємо.
+ *  - Періоди: `auctionPeriod.startDate`, `tenderPeriod.endDate`.
+ *  - Посилання: `auctionUrl`.
  */
 
 interface OpEnvelope {
@@ -23,6 +39,18 @@ interface OpEnvelope {
 
 function asArray(x: unknown): any[] {
   return Array.isArray(x) ? x : [];
+}
+
+/** Дістати рядок із локалізованого поля `{uk_UA|en_US}` або звичайного рядка. */
+function loc(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v === 'string') return v || null;
+  if (typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    const s = o.uk_UA ?? o.en_US ?? Object.values(o)[0];
+    return typeof s === 'string' ? s || null : null;
+  }
+  return null;
 }
 
 function toIso(v: unknown): string | null {
@@ -36,6 +64,19 @@ function num(v: unknown): number | null {
   return typeof n === 'number' && !isNaN(n) ? n : null;
 }
 
+/** Площа у м² з quantity + unit.code (HAR=гектар, MTK=м²); інакше null. */
+function areaSqm(quantity: unknown, unit: any): number | null {
+  const q = num(quantity);
+  if (q == null) return null;
+  const code = String(unit?.code ?? '').toUpperCase();
+  const name = (loc(unit?.name) ?? '').toLowerCase();
+  if (code === 'HAR' || name.includes('гектар')) return q * 10_000; // га → м²
+  if (code === 'MTK' || name.includes('квадратн') || name.includes('кв. м') || name.includes('м²')) {
+    return q;
+  }
+  return null;
+}
+
 export class ProzorroCollector implements Collector {
   readonly source = 'prozorro' as const;
   constructor(private apiBase = config.prozorro.apiBase) {}
@@ -46,8 +87,11 @@ export class ProzorroCollector implements Collector {
       `${this.apiBase}/search/byDateModified/${encodeURIComponent(start)}` +
       `?limit=${config.collect.pageLimit}`;
 
-    const env = await fetchJson<OpEnvelope>(url);
-    const rows = asArray(env.data);
+    const payload = await fetchJson<unknown[] | OpEnvelope>(url);
+    // Реальний ендпоінт віддає голий масив; legacy — конверт { data }.
+    const rows = Array.isArray(payload)
+      ? payload
+      : asArray((payload as OpEnvelope)?.data);
 
     const lots: NormalizedLot[] = [];
     let lastModified: string | null = cursor;
@@ -72,42 +116,54 @@ export class ProzorroCollector implements Collector {
 
   private normalize(a: any): NormalizedLot | null {
     if (!a || typeof a !== 'object') return null;
-    const sourceId: string | undefined = a.auctionId ?? a.id ?? a._id;
+    const sourceId: string | undefined = a.auctionId ?? a._id ?? a.id ?? a.lotId;
     if (!sourceId) return null;
 
     const items = asArray(a.items);
     const first = items[0] ?? {};
 
-    // коди класифікації (основна + додаткові) з усіх items
+    // коди класифікації CAV (основна + додаткові) та їх описи з усіх items
     const codes: string[] = [];
+    const classDescr: string[] = [];
     for (const it of items) {
-      if (it?.classification?.id) codes.push(String(it.classification.id));
+      if (it?.classification?.id) {
+        codes.push(String(it.classification.id));
+        const d = loc(it.classification.description);
+        if (d) classDescr.push(d);
+      }
       for (const ac of asArray(it?.additionalClassifications)) {
         if (ac?.id) codes.push(String(ac.id));
+        const d = loc(ac?.description);
+        if (d) classDescr.push(d);
       }
     }
 
-    const title: string = a.title ?? first?.description ?? '';
-    const description: string = a.description ?? first?.description ?? '';
-    const sellingMethod: string | null = a.sellingMethod ?? a.procurementMethodType ?? null;
-    const assetType = classifyAsset(sellingMethod, codes, `${title} ${description}`);
+    const title = loc(a.title) ?? loc(first?.description) ?? '';
+    const description = loc(a.description) ?? loc(first?.description) ?? '';
+    const sellingMethod: string | null = a.sellingMethod ?? a.saleType ?? null;
+    // текст для класифікації включає описи класифікатора CAV (укр.)
+    const classifyText = `${title} ${description} ${classDescr.join(' ')}`;
+    const assetType = classifyAsset(sellingMethod, codes, classifyText);
 
-    // ціна: стартова (value) та поточна (де є)
+    // ціна: стартова (value) та мін. крок як fallback
     const startPrice = num(a.value?.amount) ?? num(a.minimalStep?.amount) ?? null;
     const currency = a.value?.currency ?? 'UAH';
 
-    // адреса/регіон з items або procuringEntity
-    const addr = first?.address ?? a.procuringEntity?.address ?? {};
-    const region = addr?.region ?? addr?.locality ?? null;
-    const address = [addr?.region, addr?.locality, addr?.streetAddress]
-      .filter(Boolean)
-      .join(', ') || null;
+    // оцінка: експертна (ринкова), інакше нормативна
+    const valuation =
+      num(a.expertMonetaryValuation?.amount) ??
+      num(a.normativeMonetaryValuation?.amount) ??
+      null;
 
-    // площа з quantity (де одиниця = кв.м / га)
-    let area: number | null = null;
-    const q = num(first?.quantity);
-    const unit = (first?.unit?.name ?? first?.unit?.code ?? '').toLowerCase();
-    if (q != null && (unit.includes('м2') || unit.includes('кв') || unit.includes('м²'))) area = q;
+    // адреса активу — з items; fallback — sellingEntity (орган, що продає)
+    const addr = first?.address ?? a.sellingEntity?.address ?? {};
+    const region = loc(addr?.region) ?? loc(addr?.locality);
+    const address =
+      [loc(addr?.region), loc(addr?.locality), loc(addr?.streetAddress)]
+        .filter(Boolean)
+        .join(', ') || null;
+
+    const area = areaSqm(first?.quantity, first?.unit);
 
     const auctionStart = toIso(a.auctionPeriod?.startDate);
     const bidsEnd =
@@ -136,7 +192,7 @@ export class ProzorroCollector implements Collector {
       start_price: startPrice,
       current_price: startPrice,
       currency,
-      valuation: num(a.value?.valueAddedTaxIncluded ? null : a.valuation?.amount) ?? null,
+      valuation,
       auction_start: auctionStart,
       bids_end: bidsEnd,
       raw: a,

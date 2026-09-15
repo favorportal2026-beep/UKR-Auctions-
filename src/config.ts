@@ -11,9 +11,15 @@ function opt(name: string, fallback = ''): string {
 }
 
 export const config = {
+  // Ліниві геттери: ключі Supabase вимагаються лише при реальному доступі до БД
+  // (див. db()), тому --dry-run працює без них. Пор. safeConfig() нижче.
   supabase: {
-    url: req('SUPABASE_URL'),
-    serviceKey: req('SUPABASE_SERVICE_ROLE_KEY'),
+    get url() {
+      return req('SUPABASE_URL');
+    },
+    get serviceKey() {
+      return req('SUPABASE_SERVICE_ROLE_KEY');
+    },
   },
   prozorro: {
     apiBase: opt('PROZORRO_API_BASE', 'https://procedure.prozorro.sale/api'),
@@ -21,7 +27,13 @@ export const config = {
     startDate: opt('PROZORRO_START_DATE', '2026-09-01'),
   },
   setam: {
-    csvUrl: opt('SETAM_CSV_URL'),
+    // Дефолт — останній відомий помісячний CSV-ресурс СЕТАМ на data.gov.ua
+    // (dataset c360d1ef…, снапшот 2026-09). Оновлювати щомісяця новим resource URL
+    // або перевизначати через змінну SETAM_CSV_URL. Див. CLAUDE.md.
+    csvUrl: opt(
+      'SETAM_CSV_URL',
+      'https://data.gov.ua/dataset/c360d1ef-4eee-4158-812f-ede20c4cc943/resource/940e7a39-eaba-4532-a48a-edf7e0d3177c/download/auctions-14-09-2026.csv'
+    ),
   },
   telegram: {
     botToken: opt('TELEGRAM_BOT_TOKEN'),
