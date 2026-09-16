@@ -26,8 +26,19 @@ const STREET_SUFFIX =
 const STREET_NUMFIRST =
   /(\d+[А-ЯІЇЄҐа-яіїєґ]?)\s*,\s*(?:вулиця|вул\.?|проспект|просп\.?|провулок|пров\.?|бульвар|бульв\.?|площа|пл\.?|шосе)\s*\.?\s*([А-ЯІЇЄҐа-яіїєґ'’\.\s-]{2,40}?)(?:,|$)/i;
 
+// Район: «Ковельський район» / «Ковельський р-н» / «Ковельський р.» → «Ковельський».
+// ВАЖЛИВО: у JS \b працює лише з ASCII, тож для кирилиці використовуємо lookahead.
+const DISTRICT_RE =
+  /([А-ЯІЇЄҐ][А-Яа-яІіЇїЄєҐґ'’\-]+?)\s+(?:район|р-?н|р\.)(?=[\s,.)]|$)/;
+
 function tidy(s: string): string {
   return s.replace(/[.,]/g, ' ').replace(/\s{2,}/g, ' ').trim();
+}
+
+/** Район із тексту (для землі — коли немає вулиці й точного села). */
+function districtPart(raw: string): string | null {
+  const m = raw.match(DISTRICT_RE);
+  return m ? m[1]! : null;
 }
 
 function streetPart(raw: string): string | null {
@@ -49,8 +60,9 @@ function addressText(lot: GeoLot): string {
   return lot.address ?? lot.title ?? lot.region ?? '';
 }
 
-/** Місто: спершу за префіксом (м./с./смт), інакше — перша «не-область» кома-частина. */
-function guessCity(raw: string, region: string | null): string | undefined {
+/** Місто/село: за префіксом (м./с./смт), інакше — перша «не-область» кома-частина.
+ *  Повертає undefined, якщо населеного пункту не видно (тоді впадемо в район/область). */
+function guessCity(raw: string): string | undefined {
   const m = raw.match(CITY_RE);
   if (m) return m[1];
   for (const part of raw.split(',').map((s) => s.trim())) {
@@ -61,15 +73,33 @@ function guessCity(raw: string, region: string | null): string | undefined {
       return part.charAt(0) + part.slice(1).toLowerCase();
     }
   }
-  return region ? region.replace(/\s*(область|обл\.?)/i, '').trim() : undefined;
+  return undefined;
 }
 
 export function buildGeoQuery(lot: GeoLot): GeoQuery {
   const raw = addressText(lot);
   const oblast = lot.region ?? '';
-  const city = guessCity(raw, lot.region ?? null);
+  const city = guessCity(raw);
+  const district = districtPart(raw);
   const street = streetPart(raw);
-  const cityForm = [city, oblast].filter(Boolean).join(', ') || 'Україна';
-  const freeform = street && city ? `${street}, ${city}` : cityForm;
+
+  // Рівні точності (від кращого): вулиця+місто → місто → район → область.
+  // freeform — найточніше, що є; cityForm — запасний, на щабель ширший.
+  let freeform: string;
+  let cityForm: string;
+  if (street && city) {
+    freeform = `${street}, ${city}`;
+    cityForm = [city, oblast].filter(Boolean).join(', ') || 'Україна';
+  } else if (city) {
+    // для землі часто корисно уточнити місто районом
+    freeform = [city, district ? `${district} район` : null, oblast].filter(Boolean).join(', ');
+    cityForm = [district ? `${district} район` : null, oblast].filter(Boolean).join(', ') || oblast || 'Україна';
+  } else if (district) {
+    freeform = [`${district} район`, oblast].filter(Boolean).join(', ');
+    cityForm = oblast || 'Україна';
+  } else {
+    freeform = oblast || 'Україна';
+    cityForm = oblast || 'Україна';
+  }
   return { freeform, cityForm };
 }
