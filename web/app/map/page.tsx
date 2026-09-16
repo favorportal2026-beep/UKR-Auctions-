@@ -5,6 +5,8 @@ import { lotPoint } from '@/lib/geo';
 import MapClient from './MapClient';
 import type { MapPoint } from './MapboxMap';
 import { getMapboxToken } from '@/lib/mapbox/config';
+import RegionPanel, { type RegionItem } from './RegionPanel';
+import { OBLASTS, normalizeRegion } from '@/lib/geo/oblasts';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,15 +29,28 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
   if (region) query = query.ilike('region', `%${region}%`);
   if (crit) query = query.eq('matches.criteria_id', crit);
 
-  const [{ data, error }, { data: critData }] = await Promise.all([
+  const [{ data, error }, { data: critData }, { data: rcData }] = await Promise.all([
     query,
     sb.from('criteria').select('*').order('name'),
+    sb.rpc('region_counts'),
   ]);
   if (error) {
     return <div className="notice">Помилка доступу до бази: {error.message}.</div>;
   }
   const lots = (data ?? []) as unknown as Lot[];
   const criteria = (critData ?? []) as Criteria[];
+
+  // Лічильники по областях: зводимо «сирі» region до стему й сумуємо.
+  const countByStem = new Map<string, number>();
+  for (const row of (rcData ?? []) as { region: string; n: number }[]) {
+    const stem = normalizeRegion(row.region);
+    if (stem) countByStem.set(stem, (countByStem.get(stem) ?? 0) + Number(row.n));
+  }
+  const regionItems: RegionItem[] = OBLASTS.map((o) => ({
+    stem: o.stem,
+    name: o.name,
+    count: countByStem.get(o.stem) ?? 0,
+  }));
 
   const points: MapPoint[] = [];
   let noGeo = 0;
@@ -114,6 +129,8 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
         <span><i style={{ background: '#1f8f5a' }} /> земля</span>
         <span className="muted">бейдж: P — Prozorro, С — СЕТАМ · бліда плашка = орієнтовно (центр області) · клік по області = фільтр</span>
       </div>
+
+      <RegionPanel items={regionItems} selected={region || null} />
 
       <div className="map-box">
         <MapClient points={points} token={getMapboxToken()} selectedRegion={region || null} />
