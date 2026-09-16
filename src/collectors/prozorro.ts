@@ -168,6 +168,17 @@ export class ProzorroCollector implements Collector {
 
     const area = areaSqm(first?.quantity, first?.unit);
 
+    // Перше фото: документ типу illustration з растровим форматом (не svg-заглушка).
+    let imageUrl: string | null = null;
+    for (const d of asArray(a.documents)) {
+      if (d?.documentType !== 'illustration') continue;
+      const fmt = String(d?.format ?? '');
+      if (fmt.startsWith('image/') && fmt !== 'image/svg+xml' && d?.url) {
+        imageUrl = String(d.url);
+        break;
+      }
+    }
+
     const auctionStart = toIso(a.auctionPeriod?.startDate);
     const bidsEnd =
       toIso(a.tenderPeriod?.endDate) ??
@@ -193,6 +204,7 @@ export class ProzorroCollector implements Collector {
       lat: num(addr?.latitude),
       lng: num(addr?.longitude),
       area_sqm: area,
+      image_url: imageUrl,
       start_price: startPrice,
       current_price: startPrice,
       currency,

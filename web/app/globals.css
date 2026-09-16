@@ -95,7 +95,28 @@ input:focus, select:focus, textarea:focus { outline: 2px solid color-mix(in srgb
 
 /* lot cards */
 .lots { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+/* Сітка — картки в кілька колонок (за замовч.); Список — один стовпчик рядками */
+.lots.grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.lots.list { grid-template-columns: 1fr; }
+.lots.list .lot { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: 8px 20px; }
+.lots.list .lot h3 { flex: 1 1 340px; order: 1; }
+.lots.list .lot .price { order: 0; min-width: 150px; }
+.lots.list .lot .lot-top { order: 0; }
+.lots.list .lot .meta { order: 2; flex-basis: 100%; }
+.lots.list .lot .matched { order: 3; flex-basis: 100%; }
+.lots.list .lot .lot-actions { order: 4; }
+
+/* Перемикач режимів Мапа/Список/Сітка */
+.view-switcher { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.view-switcher .vs-btn { padding: 6px 13px; font-size: 13px; font-weight: 700; color: var(--ink-dim); text-decoration: none; background: var(--surface); border-right: 1px solid var(--line); }
+.view-switcher .vs-btn:last-child { border-right: 0; }
+.view-switcher .vs-btn.active { background: var(--accent); color: #fff; }
 .lot { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 15px 16px; display: flex; flex-direction: column; gap: 10px; position: relative; }
+/* Фото лота */
+.lot-photo { width: 100%; aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+.lot-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lot-photo-empty { width: 100%; height: 100%; display: grid; place-items: center; color: var(--ink-dim); font-size: 12px; }
+.lots.list .lot-photo { order: 0; width: 150px; aspect-ratio: 4 / 3; flex: 0 0 auto; }
 .lot.hidden-lot { opacity: 0.55; }
 .lot-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
 .badges { display: flex; gap: 6px; flex-wrap: wrap; }

@@ -3,6 +3,7 @@ import type { Criteria, Lot } from '@/lib/types';
 import { ASSET_LABEL, SOURCE_LABEL, area, dateShort, discountLabel, money } from '@/lib/format';
 import { applyLotFilters, parseLotFilters, SUBTYPE_LABEL, type SP } from '@/lib/filters';
 import LotFilterFields from './components/LotFilterFields';
+import ViewSwitcher from './components/ViewSwitcher';
 import { hideLot, rematchAll, unhideLot } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,7 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
   const crit = searchParams.crit || '';
   const matchedOnly = searchParams.matched === '1';
   const includeHidden = searchParams.hidden === '1';
+  const view = searchParams.view === 'list' ? 'list' : 'grid';
 
   const needInner = matchedOnly || !!crit;
   const selectStr = needInner
@@ -41,6 +43,7 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
     <main>
       <div className="page-head">
         <h1>Лоти</h1>
+        <ViewSwitcher />
         <form action={rematchAll}>
           <button className="btn btn-sm" type="submit" title="Перерахувати збіги за поточними критеріями">
             ↻ Перерахувати збіги
@@ -85,7 +88,7 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
       {rows.length === 0 ? (
         <div className="empty">Лотів за фільтром немає. Спробуйте скинути фільтри або зачекайте на наступний збір.</div>
       ) : (
-        <div className="lots">
+        <div className={`lots ${view}`}>
           {rows.map((r) => <LotCard key={r.id} row={r} />)}
         </div>
       )}
@@ -105,6 +108,15 @@ function LotCard({ row }: { row: Row }) {
           {row.hidden ? '↩' : '✕'}
         </button>
       </form>
+
+      <div className="lot-photo">
+        {row.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={row.image_url} alt="" loading="lazy" />
+        ) : (
+          <div className="lot-photo-empty">без фото</div>
+        )}
+      </div>
 
       <div className="lot-top">
         <div className="badges">

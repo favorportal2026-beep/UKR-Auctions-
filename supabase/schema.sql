@@ -30,6 +30,7 @@ create table if not exists lots (
   lat            double precision,
   lng            double precision,
   area_sqm       numeric,                         -- площа (м² або переведено)
+  image_url      text,                            -- перше фото (Prozorro illustration)
   start_price    numeric,
   current_price  numeric,
   currency       text default 'UAH',
