@@ -107,6 +107,15 @@ export function isTracked(t: AssetType): boolean {
   return t === 'real_estate' || t === 'land';
 }
 
+// Кадастровий номер: ХХХХХХХХХХ:ХХ:ХХХ:ХХХХ (10:2:3-4:3-4).
+const CADASTRE_RE = /\d{10}:\d{2}:\d{3,4}:\d{3,4}/;
+
+/** Дістає кадастровий номер із тексту (назва+опис) або null. */
+export function extractCadastre(text: string | null | undefined): string | null {
+  const m = (text ?? '').match(CADASTRE_RE);
+  return m ? m[0] : null;
+}
+
 // СЕТАМ «Категорія» → підтип (сильний сигнал; житлову уточнюємо за текстом).
 const SETAM_SUBTYPE_MAP: Record<string, AssetSubtype> = {
   'комерційна нерухомість': 'premises',

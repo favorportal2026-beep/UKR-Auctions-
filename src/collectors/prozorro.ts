@@ -1,7 +1,7 @@
 import { config } from '../config.js';
 import type { CollectResult, NormalizedLot } from '../types.js';
 import { fetchJson, type Collector } from './base.js';
-import { classifyAsset, classifySubtype } from './classify.js';
+import { classifyAsset, classifySubtype, extractCadastre } from './classify.js';
 
 /**
  * Колектор Prozorro.Sale (ЦБД-New, відкрите API).
@@ -204,6 +204,7 @@ export class ProzorroCollector implements Collector {
       lat: num(addr?.latitude),
       lng: num(addr?.longitude),
       area_sqm: area,
+      cadastral_number: extractCadastre(classifyText),
       image_url: imageUrl,
       start_price: startPrice,
       current_price: startPrice,

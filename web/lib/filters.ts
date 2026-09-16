@@ -48,6 +48,7 @@ export type LotFilters = {
   areaMin: number | null;
   areaMax: number | null;
   deadline: string; // '' | '1' | '3' | '7'
+  cadastr: string; // кадастровий номер (частковий збіг)
 };
 
 function num(v: string | undefined): number | null {
@@ -68,6 +69,7 @@ export function parseLotFilters(sp: SP): LotFilters {
     areaMin: num(sp.area_min),
     areaMax: num(sp.area_max),
     deadline: sp.deadline || '',
+    cadastr: (sp.cadastr || '').trim(),
   };
 }
 
@@ -83,6 +85,7 @@ export function applyLotFilters<T>(query: T, f: LotFilters): T {
   if (f.subtype) q = q.eq('subtype', f.subtype);
   if (f.region) q = q.ilike('region', `%${f.region}%`);
   if (f.q) q = q.or(`title.ilike.%${f.q}%,description.ilike.%${f.q}%`);
+  if (f.cadastr) q = q.ilike('cadastral_number', `%${f.cadastr}%`);
   if (f.priceMin != null) q = q.gte('current_price', f.priceMin);
   if (f.priceMax != null) q = q.lte('current_price', f.priceMax);
   if (f.areaMin != null) q = q.gte('area_sqm', f.areaMin);

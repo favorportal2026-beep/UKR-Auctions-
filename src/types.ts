@@ -31,6 +31,7 @@ export interface NormalizedLot {
   lat?: number | null;
   lng?: number | null;
   area_sqm?: number | null;
+  cadastral_number?: string | null; // кадастровий номер ділянки (для землі)
   image_url?: string | null; // перше фото (Prozorro illustration); СЕТАМ — немає
   start_price?: number | null;
   current_price?: number | null;

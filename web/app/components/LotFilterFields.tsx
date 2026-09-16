@@ -61,6 +61,10 @@ export default function LotFilterFields({ f }: { f: LotFilters }) {
         <label>Пошук</label>
         <input name="q" defaultValue={f.q} placeholder="квартира, ділянка…" />
       </div>
+      <div className="field">
+        <label>Кадастровий номер</label>
+        <input name="cadastr" defaultValue={f.cadastr} placeholder="1234567890:12:345:6789" />
+      </div>
     </>
   );
 }
