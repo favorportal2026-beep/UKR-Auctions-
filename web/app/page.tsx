@@ -1,25 +1,17 @@
 import { db } from '@/lib/supabase';
-import type { AssetType, Criteria, Lot, LotSource } from '@/lib/types';
+import type { Criteria, Lot } from '@/lib/types';
 import { ASSET_LABEL, SOURCE_LABEL, area, dateShort, discountLabel, money } from '@/lib/format';
+import { applyLotFilters, parseLotFilters, SUBTYPE_LABEL, type SP } from '@/lib/filters';
+import LotFilterFields from './components/LotFilterFields';
 import { hideLot, rematchAll, unhideLot } from './actions';
 
 export const dynamic = 'force-dynamic';
 
 type Row = Lot & { matches: { criteria_id: string; criteria: { id: string; name: string } | null }[] };
-type SP = Record<string, string | undefined>;
-
-function num(v: string | undefined): number | null {
-  if (!v) return null;
-  const n = Number(v);
-  return isNaN(n) ? null : n;
-}
 
 export default async function Dashboard({ searchParams }: { searchParams: SP }) {
   const sb = db();
-  const source = searchParams.source || '';
-  const asset = searchParams.asset || '';
-  const region = (searchParams.region || '').trim();
-  const q = (searchParams.q || '').trim();
+  const f = parseLotFilters(searchParams);
   const crit = searchParams.crit || '';
   const matchedOnly = searchParams.matched === '1';
   const includeHidden = searchParams.hidden === '1';
@@ -30,10 +22,7 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
     : '*, matches(criteria_id, criteria(id,name))';
 
   let query = sb.from('lots').select(selectStr).order('updated_at', { ascending: false }).limit(300);
-  if (source) query = query.eq('source', source);
-  if (asset) query = query.eq('asset_type', asset);
-  if (region) query = query.ilike('region', `%${region}%`);
-  if (q) query = query.ilike('title', `%${q}%`);
+  query = applyLotFilters(query, f);
   if (crit) query = query.eq('matches.criteria_id', crit);
   if (!includeHidden) query = query.eq('hidden', false);
 
@@ -68,23 +57,7 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
 
       <form className="filters" method="get">
         <div className="row">
-          <div className="field">
-            <label>Джерело</label>
-            <select name="source" defaultValue={source}>
-              <option value="">Усі</option>
-              <option value="prozorro">Prozorro.Sale</option>
-              <option value="setam">СЕТАМ</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>Тип</label>
-            <select name="asset" defaultValue={asset}>
-              <option value="">Усі</option>
-              <option value="real_estate">Нерухомість</option>
-              <option value="land">Земля</option>
-              <option value="other">Інше</option>
-            </select>
-          </div>
+          <LotFilterFields f={f} />
           <div className="field">
             <label>Критерій</label>
             <select name="crit" defaultValue={crit}>
@@ -93,14 +66,6 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-          </div>
-          <div className="field">
-            <label>Регіон</label>
-            <input name="region" defaultValue={region} placeholder="напр. Київ" />
-          </div>
-          <div className="field">
-            <label>Пошук у назві</label>
-            <input name="q" defaultValue={q} placeholder="квартира, ділянка…" />
           </div>
           <div className="field check">
             <input id="m" type="checkbox" name="matched" value="1" defaultChecked={matchedOnly} />
@@ -146,6 +111,9 @@ function LotCard({ row }: { row: Row }) {
           <span className={`badge ${row.asset_type === 'land' ? 'land' : row.asset_type === 'real_estate' ? 'realty' : ''}`}>
             {ASSET_LABEL[row.asset_type] ?? row.asset_type}
           </span>
+          {row.subtype && row.subtype !== 'land' ? (
+            <span className="badge">{SUBTYPE_LABEL[row.subtype] ?? row.subtype}</span>
+          ) : null}
           <span className="badge">{SOURCE_LABEL[row.source] ?? row.source}</span>
           {disc ? <span className="badge disc">{disc}</span> : null}
         </div>

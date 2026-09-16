@@ -226,6 +226,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid color-mix(in srgb
 }
 .price-tag:hover { filter: brightness(1.06); z-index: 1000; }
 
+/* Діапазонні поля фільтра (ціна/площа від-до) */
+.field .range { display: flex; gap: 6px; }
+.field .range input { width: 100%; min-width: 0; }
+
 /* Панель областей (чипи з лічильниками + пошук) */
 .region-panel { margin-bottom: 12px; }
 .region-panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }

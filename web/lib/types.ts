@@ -11,6 +11,7 @@ export interface Lot {
   title: string | null;
   description: string | null;
   asset_type: AssetType;
+  subtype: string | null;
   selling_method: string | null;
   status: string | null;
   region: string | null;

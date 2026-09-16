@@ -1,4 +1,4 @@
-import type { AssetType } from '../types.js';
+import type { AssetType, AssetSubtype } from '../types.js';
 
 /**
  * Класифікація типу активу (нерухомість / земля / інше).
@@ -105,4 +105,52 @@ export function classifySetam(category: string, title: string): AssetType {
 /** Чи цікавить нас цей актив (нерухомість або земля). */
 export function isTracked(t: AssetType): boolean {
   return t === 'real_estate' || t === 'land';
+}
+
+// СЕТАМ «Категорія» → підтип (сильний сигнал; житлову уточнюємо за текстом).
+const SETAM_SUBTYPE_MAP: Record<string, AssetSubtype> = {
+  'комерційна нерухомість': 'premises',
+  'промислова нерухомість': 'building',
+  'нежитлове приміщення': 'premises',
+  'будівлі': 'building',
+  'гаражі/стоянки': 'garage',
+  'недобудована': 'unfinished',
+  'земельні ділянки': 'land',
+};
+
+/**
+ * Підтип лота за текстом (назва+опис). Порядок важливий — специфічніше раніше.
+ * Використовується і для Prozorro, і як уточнення для СЕТАМ-«житлова».
+ */
+function subtypeFromText(text: string): AssetSubtype | null {
+  const h = text.toLowerCase();
+  if (includesAny(h, ['гараж', 'машиномісц', 'машино-місц', 'стоянк', 'паркомісц'])) return 'garage';
+  if (includesAny(h, ['недобуд', 'незавершен', 'незакінчен'])) return 'unfinished';
+  if (includesAny(h, ['квартир', 'кімнат'])) return 'apartment';
+  if (includesAny(h, ['котедж', 'будинок', 'будинк', 'дача', 'дачн', 'садиб'])) return 'house';
+  if (includesAny(h, ['майновий комплекс', 'цілісний майнов', 'цмк'])) return 'complex';
+  if (includesAny(h, ['приміщенн', 'офіс', 'магазин', 'склад', 'кафе', 'ресторан', 'нежитлов'])) return 'premises';
+  if (includesAny(h, ['будівл', 'спору', 'корпус', 'цех', 'ангар'])) return 'building';
+  if (includesAny(h, ['квартир', 'житлов'])) return 'apartment';
+  return null;
+}
+
+/**
+ * Підтип лота. Для землі — завжди 'land'. Для СЕТАМ спочатку категорія (з
+ * уточненням житлової за текстом), далі — текст. Fallback — 'other'.
+ */
+export function classifySubtype(
+  assetType: AssetType,
+  text: string,
+  setamCategory?: string | null
+): AssetSubtype {
+  if (assetType === 'land') return 'land';
+
+  const cat = (setamCategory ?? '').trim().toLowerCase();
+  if (cat in SETAM_SUBTYPE_MAP) return SETAM_SUBTYPE_MAP[cat]!;
+  if (cat === 'житлова нерухомість') {
+    return subtypeFromText(text) ?? 'apartment';
+  }
+
+  return subtypeFromText(text) ?? (assetType === 'real_estate' ? 'premises' : 'other');
 }

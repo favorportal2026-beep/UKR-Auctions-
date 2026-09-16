@@ -3,6 +3,18 @@
 export type LotSource = 'prozorro' | 'setam';
 export type AssetType = 'real_estate' | 'land' | 'other';
 
+/** Підтип лота для точнішого фільтра (земля/квартира/приміщення/будівля…). */
+export type AssetSubtype =
+  | 'land' // земельна ділянка
+  | 'apartment' // квартира / кімната
+  | 'house' // будинок / котедж / дача
+  | 'premises' // нежитлове/комерційне приміщення, офіс, магазин, склад
+  | 'building' // будівля / споруда / промислова
+  | 'garage' // гараж / машиномісце / стоянка
+  | 'unfinished' // недобудова / незавершене
+  | 'complex' // цілісний майновий комплекс
+  | 'other';
+
 /** Нормалізований лот — єдина модель для всіх джерел. */
 export interface NormalizedLot {
   source: LotSource;
@@ -11,6 +23,7 @@ export interface NormalizedLot {
   title?: string | null;
   description?: string | null;
   asset_type: AssetType;
+  subtype?: AssetSubtype | null;
   selling_method?: string | null;
   status?: string | null;
   region?: string | null;

@@ -2,7 +2,7 @@ import { parse } from 'csv-parse/sync';
 import { config } from '../config.js';
 import type { CollectResult, NormalizedLot } from '../types.js';
 import { fetchText, type Collector } from './base.js';
-import { classifySetam, isTracked } from './classify.js';
+import { classifySetam, classifySubtype, isTracked } from './classify.js';
 
 /**
  * Колектор СЕТАМ (арештоване/конфісковане майно).
@@ -131,6 +131,7 @@ export class SetamCollector implements Collector {
       const category = (col.category ? r[col.category] : '') ?? '';
       const assetType = classifySetam(category, title);
       if (!isTracked(assetType)) continue; // тільки нерухомість/земля
+      const subtype = classifySubtype(assetType, `${category} ${title}`, category);
 
       const rawId = (col.id && r[col.id]) ? String(r[col.id]).trim() : '';
       const sourceId =
@@ -148,6 +149,7 @@ export class SetamCollector implements Collector {
         title: title || null,
         description: category || null,
         asset_type: assetType,
+        subtype,
         selling_method: 'setam',
         status: col.status ? r[col.status] : null,
         region: col.region ? r[col.region] : null,
