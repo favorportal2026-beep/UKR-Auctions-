@@ -6,10 +6,10 @@ import MapClient from './MapClient';
 import type { MapPoint } from './MapboxMap';
 import { getMapboxToken } from '@/lib/mapbox/config';
 import RegionPanel, { type RegionItem } from './RegionPanel';
-import ResultsPanel, { type LotCard } from './ResultsPanel';
 import { OBLASTS, normalizeRegion } from '@/lib/geo/oblasts';
 import { applyLotFilters, parseLotFilters, type SP } from '@/lib/filters';
 import LotFilterFields from '../components/LotFilterFields';
+import ViewSwitcher from '../components/ViewSwitcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,45 +51,26 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
   }));
 
   const points: MapPoint[] = [];
-  const cards: LotCard[] = [];
   let noGeo = 0;
   const seen = new Set<string>();
   for (const l of lots) {
     if (seen.has(l.id)) continue; // !inner join може дублювати
     seen.add(l.id);
     const pt = lotPoint(l);
+    if (!pt) { noGeo++; continue; }
     const price = l.current_price ?? l.start_price;
-    if (pt) {
-      points.push({
-        id: l.id,
-        lat: pt[0],
-        lng: pt[1],
-        title: l.title ?? 'Без назви',
-        priceLabel: money(price, l.currency ?? 'UAH'),
-        pill: moneyCompact(price),
-        source: l.source,
-        region: l.region,
-        asset: l.asset_type,
-        url: l.lot_url,
-        approx: l.lat == null || l.lng == null,
-      });
-    } else {
-      noGeo++;
-    }
-    cards.push({
+    points.push({
       id: l.id,
+      lat: pt[0],
+      lng: pt[1],
       title: l.title ?? 'Без назви',
-      price,
-      currency: l.currency ?? 'UAH',
-      region: l.region,
-      area_sqm: l.area_sqm,
-      asset: l.asset_type,
-      subtype: l.subtype,
+      priceLabel: money(price, l.currency ?? 'UAH'),
+      pill: moneyCompact(price),
       source: l.source,
+      region: l.region,
+      asset: l.asset_type,
       url: l.lot_url,
-      bids_end: l.bids_end,
-      lat: pt ? pt[0] : null,
-      lng: pt ? pt[1] : null,
+      approx: l.lat == null || l.lng == null,
     });
   }
 
@@ -97,6 +78,7 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
     <main className="map-workspace">
       <div className="page-head">
         <h1>Мапа</h1>
+        <ViewSwitcher />
         <span className="muted">На мапі: {points.length}{noGeo ? ` · без гео: ${noGeo}` : ''}</span>
       </div>
 
@@ -129,11 +111,8 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
 
       <RegionPanel items={regionItems} selected={region || null} />
 
-      <div className="map-results-layout">
-        <div className="map-box">
-          <MapClient points={points} token={getMapboxToken()} selectedRegion={region || null} />
-        </div>
-        <ResultsPanel lots={cards} />
+      <div className="map-box">
+        <MapClient points={points} token={getMapboxToken()} selectedRegion={region || null} />
       </div>
     </main>
   );
