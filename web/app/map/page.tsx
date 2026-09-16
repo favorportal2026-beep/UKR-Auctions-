@@ -112,11 +112,11 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
       <div className="map-legend">
         <span><i style={{ background: '#e8620c' }} /> нерухомість</span>
         <span><i style={{ background: '#1f8f5a' }} /> земля</span>
-        <span className="muted">бейдж: P — Prozorro, С — СЕТАМ · бліда плашка = орієнтовно (центр області)</span>
+        <span className="muted">бейдж: P — Prozorro, С — СЕТАМ · бліда плашка = орієнтовно (центр області) · клік по області = фільтр</span>
       </div>
 
       <div className="map-box">
-        <MapClient points={points} token={getMapboxToken()} />
+        <MapClient points={points} token={getMapboxToken()} selectedRegion={region || null} />
       </div>
     </main>
   );

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import {
@@ -30,6 +31,26 @@ const SOURCE_ID = 'lots';
 const CLUSTER_LAYER = 'favor-clusters';
 const CLUSTER_COUNT_LAYER = 'favor-cluster-count';
 const UNCLUSTERED_HIT = 'favor-unclustered'; // невидимий шар-«ціль» для sync DOM-плашок
+
+// Шар полігонів областей (клік = фільтр по region).
+const OBLAST_SOURCE = 'favor-oblasts';
+const OBLAST_FILL = 'favor-oblast-fill';
+const OBLAST_LINE = 'favor-oblast-line';
+const OBLAST_GEOJSON_URL = '/geo/ua-oblasts.geojson';
+const GOLD = '#c8991f';
+
+function oblastFillColor(selected: string | null) {
+  if (!selected) return '#1f6f4a' as unknown as string;
+  return ['case', ['==', ['get', 'region'], selected], GOLD, '#1f6f4a'] as unknown as string;
+}
+function oblastFillOpacity(selected: string | null) {
+  if (!selected) return 0.06 as unknown as number;
+  return ['case', ['==', ['get', 'region'], selected], 0.32, 0.05] as unknown as number;
+}
+function oblastLineWidth(selected: string | null) {
+  if (!selected) return 0.8 as unknown as number;
+  return ['case', ['==', ['get', 'region'], selected], 2.6, 0.8] as unknown as number;
+}
 
 // Кольори за типом активу (ті самі, що на дашборді/легенді).
 const COLOR_LAND = '#1f8f5a';
@@ -85,14 +106,41 @@ function popupHtml(p: {
   );
 }
 
-export default function MapboxMap({ points, token }: { points: MapPoint[]; token: string | null }) {
+export default function MapboxMap({
+  points,
+  token,
+  selectedRegion = null,
+}: {
+  points: MapPoint[];
+  token: string | null;
+  selectedRegion?: string | null;
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const pointsRef = useRef<MapPoint[]>(points);
+  const oblastsRef = useRef<GeoJSON.FeatureCollection | null>(null);
+  const selectedRegionRef = useRef<string | null>(selectedRegion);
   const [style, setStyle] = useState<MapboxBaseStyle>(defaultMapboxBaseStyle);
 
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   pointsRef.current = points;
+  selectedRegionRef.current = selectedRegion;
+
+  // Клік по області → виставити/зняти фільтр region (зберігаючи решту фільтрів).
+  function toggleRegion(region: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if ((params.get('region') || '') === region) {
+      params.delete('region');
+    } else {
+      params.set('region', region);
+    }
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
+  }
 
   // Ініціалізація мапи (один раз).
   useEffect(() => {
@@ -112,11 +160,27 @@ export default function MapboxMap({ points, token }: { points: MapPoint[]; token
     mapRef.current = map;
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-left');
 
-    map.on('load', () => addLotsLayers(map));
+    map.on('load', () => {
+      addOblastLayer(map);
+      addLotsLayers(map);
+    });
     // Після зміни базового стилю шари треба додати знову.
-    map.on('style.load', () => addLotsLayers(map));
+    map.on('style.load', () => {
+      addOblastLayer(map);
+      addLotsLayers(map);
+    });
     map.on('render', () => syncMarkers(map));
     map.on('moveend', () => syncMarkers(map));
+
+    // Полігони областей — статичний ассет; тягнемо один раз.
+    fetch(OBLAST_GEOJSON_URL)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: GeoJSON.FeatureCollection | null) => {
+        if (!data) return;
+        oblastsRef.current = data;
+        if (mapRef.current) addOblastLayer(mapRef.current);
+      })
+      .catch(() => {});
 
     return () => {
       markersRef.current.forEach((m) => m.remove());
@@ -149,6 +213,68 @@ export default function MapboxMap({ points, token }: { points: MapPoint[]; token
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points]);
+
+  // Перемалювати підсвітку вибраної області.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map) repaintOblasts(map);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRegion]);
+
+  // Полігони областей: заливка (клік = фільтр) + обведення. Під кластерами.
+  function addOblastLayer(map: mapboxgl.Map) {
+    const data = oblastsRef.current;
+    if (!data || !map.isStyleLoaded()) return;
+    const sel = selectedRegionRef.current;
+    if (!map.getSource(OBLAST_SOURCE)) {
+      map.addSource(OBLAST_SOURCE, { type: 'geojson', data });
+    }
+    // Полігони мають бути ПІД кластерами лотів (щоб не перекривали й не крали кліки).
+    const below = map.getLayer(CLUSTER_LAYER) ? CLUSTER_LAYER : undefined;
+    if (!map.getLayer(OBLAST_FILL)) {
+      map.addLayer(
+        {
+          id: OBLAST_FILL,
+          type: 'fill',
+          source: OBLAST_SOURCE,
+          paint: { 'fill-color': oblastFillColor(sel), 'fill-opacity': oblastFillOpacity(sel) },
+        },
+        below,
+      );
+    }
+    if (!map.getLayer(OBLAST_LINE)) {
+      map.addLayer(
+        {
+          id: OBLAST_LINE,
+          type: 'line',
+          source: OBLAST_SOURCE,
+          paint: { 'line-color': '#ffffff', 'line-opacity': 0.55, 'line-width': oblastLineWidth(sel) },
+        },
+        below,
+      );
+    }
+    map.on('click', OBLAST_FILL, (e) => {
+      // Якщо під курсором кластер — хай виграє він (зум), а не фільтр області.
+      if (
+        map.getLayer(CLUSTER_LAYER) &&
+        map.queryRenderedFeatures(e.point, { layers: [CLUSTER_LAYER] }).length > 0
+      ) {
+        return;
+      }
+      const region = e.features?.[0]?.properties?.region;
+      if (typeof region === 'string' && region) toggleRegion(region);
+    });
+    map.on('mouseenter', OBLAST_FILL, () => (map.getCanvas().style.cursor = 'pointer'));
+    map.on('mouseleave', OBLAST_FILL, () => (map.getCanvas().style.cursor = ''));
+  }
+
+  function repaintOblasts(map: mapboxgl.Map) {
+    if (!map.getLayer(OBLAST_FILL)) return;
+    const sel = selectedRegionRef.current;
+    map.setPaintProperty(OBLAST_FILL, 'fill-color', oblastFillColor(sel));
+    map.setPaintProperty(OBLAST_FILL, 'fill-opacity', oblastFillOpacity(sel));
+    map.setPaintProperty(OBLAST_LINE, 'line-width', oblastLineWidth(sel));
+  }
 
   function addLotsLayers(map: mapboxgl.Map) {
     if (!map.getSource(SOURCE_ID)) {
