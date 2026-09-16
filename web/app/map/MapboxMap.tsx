@@ -221,6 +221,31 @@ export default function MapboxMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRegion]);
 
+  // «Показати на мапі» зі списку → політ до точки + попап.
+  useEffect(() => {
+    function onFocus(e: Event) {
+      const map = mapRef.current;
+      const d = (e as CustomEvent).detail as {
+        lat: number;
+        lng: number;
+        title: string;
+        priceLabel: string;
+        region: string | null;
+        url: string | null;
+      };
+      if (!map || d?.lat == null || d?.lng == null) return;
+      map.flyTo({ center: [d.lng, d.lat], zoom: Math.max(map.getZoom(), 12), essential: true });
+      new mapboxgl.Popup({ offset: 16, closeButton: true })
+        .setLngLat([d.lng, d.lat])
+        .setHTML(
+          popupHtml({ priceLabel: d.priceLabel, title: d.title, region: d.region, approx: 0, url: d.url }),
+        )
+        .addTo(map);
+    }
+    window.addEventListener('favor-focus-lot', onFocus as EventListener);
+    return () => window.removeEventListener('favor-focus-lot', onFocus as EventListener);
+  }, []);
+
   // Полігони областей: заливка (клік = фільтр) + обведення. Під кластерами.
   function addOblastLayer(map: mapboxgl.Map) {
     const data = oblastsRef.current;
