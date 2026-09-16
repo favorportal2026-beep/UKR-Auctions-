@@ -1,7 +1,7 @@
 import { db } from '@/lib/supabase';
 import type { Criteria, Lot } from '@/lib/types';
 import { ASSET_LABEL, SOURCE_LABEL, area, dateShort, discountLabel, money } from '@/lib/format';
-import { applyLotFilters, parseLotFilters, SUBTYPE_LABEL, type SP } from '@/lib/filters';
+import { applyLotFilters, applyLotSort, parseLotFilters, SORT_OPTIONS, SUBTYPE_LABEL, type SP } from '@/lib/filters';
 import LotFilterFields from './components/LotFilterFields';
 import ViewSwitcher from './components/ViewSwitcher';
 import { hideLot, rematchAll, unhideLot } from './actions';
@@ -17,14 +17,16 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
   const matchedOnly = searchParams.matched === '1';
   const includeHidden = searchParams.hidden === '1';
   const view = searchParams.view === 'list' ? 'list' : 'grid';
+  const sort = searchParams.sort || 'new';
 
   const needInner = matchedOnly || !!crit;
   const selectStr = needInner
     ? '*, matches!inner(criteria_id, criteria(id,name))'
     : '*, matches(criteria_id, criteria(id,name))';
 
-  let query = sb.from('lots').select(selectStr).order('updated_at', { ascending: false }).limit(300);
+  let query = sb.from('lots').select(selectStr).limit(300);
   query = applyLotFilters(query, f);
+  query = applyLotSort(query, sort);
   if (crit) query = query.eq('matches.criteria_id', crit);
   if (!includeHidden) query = query.eq('hidden', false);
 
@@ -61,6 +63,14 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
       <form className="filters" method="get">
         <div className="row">
           <LotFilterFields f={f} />
+          <div className="field">
+            <label>Сортування</label>
+            <select name="sort" defaultValue={sort}>
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
           <div className="field">
             <label>Критерій</label>
             <select name="crit" defaultValue={crit}>

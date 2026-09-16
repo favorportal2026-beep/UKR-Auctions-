@@ -37,6 +37,35 @@ export const DEADLINE_OPTIONS: { value: string; label: string }[] = [
   { value: '7', label: 'До тижня' },
 ];
 
+// Сортування списку/сітки.
+export const SORT_OPTIONS: { value: string; label: string }[] = [
+  { value: 'new', label: 'Спочатку нові' },
+  { value: 'price_asc', label: 'Ціна ↑' },
+  { value: 'price_desc', label: 'Ціна ↓' },
+  { value: 'area_desc', label: 'Площа ↓' },
+  { value: 'deadline', label: 'Дедлайн (скоро)' },
+  { value: 'discount', label: 'Знижка від оцінки' },
+];
+
+/** Застосовує сортування до запиту `lots`. */
+export function applyLotSort<T>(query: T, sort: string): T {
+  const q = query as any;
+  switch (sort) {
+    case 'price_asc':
+      return q.order('current_price', { ascending: true, nullsFirst: false }) as T;
+    case 'price_desc':
+      return q.order('current_price', { ascending: false, nullsFirst: false }) as T;
+    case 'area_desc':
+      return q.order('area_sqm', { ascending: false, nullsFirst: false }) as T;
+    case 'deadline':
+      return q.order('bids_end', { ascending: true, nullsFirst: false }) as T;
+    case 'discount':
+      return q.order('price_to_valuation', { ascending: true, nullsFirst: false }) as T;
+    default:
+      return q.order('updated_at', { ascending: false }) as T;
+  }
+}
+
 export type LotFilters = {
   source: string;
   asset: string;
