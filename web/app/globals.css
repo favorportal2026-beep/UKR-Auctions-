@@ -132,8 +132,61 @@ input:focus, select:focus, textarea:focus { outline: 2px solid color-mix(in srgb
 
 .notice { background: color-mix(in srgb, var(--amber) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--amber) 34%, var(--line)); border-radius: 10px; padding: 10px 14px; font-size: 13.5px; margin-bottom: 18px; }
 
+/* map-first розкладка: мапа домінує, список — вузька панель, що скролиться */
+.map-results-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(21rem, 32vw, 30rem);
+  gap: 14px;
+  align-items: stretch;
+}
+@media (max-width: 1023px) {
+  .map-results-layout { grid-template-columns: 1fr; }
+}
+
+.results-panel {
+  display: flex; flex-direction: column; height: 74vh; min-height: 420px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden;
+}
+@media (max-width: 1023px) {
+  .results-panel { height: auto; max-height: 70vh; }
+}
+.results-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 12px; border-bottom: 1px solid var(--line); flex: 0 0 auto;
+}
+.results-count { font-weight: 700; font-size: 13px; }
+.view-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.view-toggle button { border: 0; background: transparent; padding: 5px 10px; font-size: 12px; font-weight: 700; color: var(--ink-dim); cursor: pointer; }
+.view-toggle button.active { background: var(--accent); color: #fff; }
+
+.results-list { overflow-y: auto; padding: 10px; display: grid; gap: 10px; }
+.results-list.list { grid-template-columns: 1fr; }
+.results-list.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 1279px) { .results-list.grid { grid-template-columns: 1fr; } }
+
+.lot-card {
+  border: 1px solid var(--line); border-left: 4px solid var(--ink-dim);
+  border-radius: 10px; background: var(--surface-2); overflow: hidden;
+}
+.lot-card.c-realty { border-left-color: #e8620c; }
+.lot-card.c-land { border-left-color: #1f8f5a; }
+.lot-card.c-other { border-left-color: #6b6a63; }
+.lot-card-body { padding: 10px 12px; }
+.lot-price { font-weight: 800; font-size: 15px; color: var(--ink); }
+.lot-title { font-size: 13px; line-height: 1.35; margin: 3px 0 6px; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lot-meta { font-size: 12px; color: var(--ink-dim); display: flex; gap: 5px; flex-wrap: wrap; }
+.lot-tags { display: flex; gap: 5px; flex-wrap: wrap; margin: 7px 0; }
+.lot-tag { font-size: 11px; font-weight: 600; color: var(--ink-dim); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+.lot-actions { display: flex; gap: 8px; margin-top: 6px; }
+.lot-btn { font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; text-decoration: none; }
+.lot-btn:hover { border-color: var(--accent); }
+.lot-btn:disabled { opacity: .5; cursor: default; }
+.lot-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
 /* map (Mapbox GL) */
-.map-box { position: relative; height: 72vh; min-height: 420px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.map-box { position: relative; height: 74vh; min-height: 420px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+@media (max-width: 1023px) { .map-box { height: 58vh; } }
 .map-box .mapboxgl-canvas { outline: none; }
 .map-loading { display: grid; place-items: center; height: 100%; color: var(--ink-dim); }
 
