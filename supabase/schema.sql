@@ -22,6 +22,7 @@ create table if not exists lots (
   title          text,
   description    text,
   asset_type     asset_type  not null default 'other',
+  subtype        text,                            -- підтип: land/apartment/house/premises/building/garage/unfinished/complex/other
   selling_method text,                            -- напр. landSell, basicSell, bankruptcy...
   status         text,
   region         text,                            -- область/місто
@@ -44,6 +45,7 @@ create table if not exists lots (
 );
 
 create index if not exists idx_lots_asset_type   on lots (asset_type);
+create index if not exists idx_lots_subtype       on lots (subtype);
 create index if not exists idx_lots_region       on lots (region);
 create index if not exists idx_lots_status       on lots (status);
 create index if not exists idx_lots_bids_end     on lots (bids_end);

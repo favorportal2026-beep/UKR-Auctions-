@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { money, area, dateShort, ASSET_LABEL } from '@/lib/format';
+import { SUBTYPE_LABEL } from '@/lib/filters';
 
 export type LotCard = {
   id: string;
@@ -11,6 +12,7 @@ export type LotCard = {
   region: string | null;
   area_sqm: number | null;
   asset: string;
+  subtype: string | null;
   source: string;
   url: string | null;
   bids_end: string | null;
@@ -101,7 +103,9 @@ export default function ResultsPanel({ lots }: { lots: LotCard[] }) {
               </div>
               <div className="lot-tags">
                 <span className="lot-tag">{c.source === 'prozorro' ? 'Prozorro' : 'СЕТАМ'}</span>
-                <span className="lot-tag">{ASSET_LABEL[c.asset] ?? c.asset}</span>
+                <span className="lot-tag">
+                  {c.subtype ? SUBTYPE_LABEL[c.subtype] ?? c.subtype : ASSET_LABEL[c.asset] ?? c.asset}
+                </span>
                 {c.bids_end ? <span className="lot-tag">до {dateShort(c.bids_end)}</span> : null}
               </div>
               <div className="lot-actions">

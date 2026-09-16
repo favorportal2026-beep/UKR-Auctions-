@@ -8,16 +8,15 @@ import { getMapboxToken } from '@/lib/mapbox/config';
 import RegionPanel, { type RegionItem } from './RegionPanel';
 import ResultsPanel, { type LotCard } from './ResultsPanel';
 import { OBLASTS, normalizeRegion } from '@/lib/geo/oblasts';
+import { applyLotFilters, parseLotFilters, type SP } from '@/lib/filters';
+import LotFilterFields from '../components/LotFilterFields';
 
 export const dynamic = 'force-dynamic';
 
-type SP = Record<string, string | undefined>;
-
 export default async function MapPage({ searchParams }: { searchParams: SP }) {
   const sb = db();
-  const source = searchParams.source || '';
-  const asset = searchParams.asset || '';
-  const region = (searchParams.region || '').trim();
+  const f = parseLotFilters(searchParams);
+  const region = f.region;
   const crit = searchParams.crit || '';
   const matchedOnly = searchParams.matched === '1';
 
@@ -25,9 +24,7 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
   const selectStr = needInner ? '*, matches!inner(criteria_id)' : '*';
 
   let query = sb.from('lots').select(selectStr).eq('hidden', false).limit(2000);
-  if (source) query = query.eq('source', source);
-  if (asset) query = query.eq('asset_type', asset);
-  if (region) query = query.ilike('region', `%${region}%`);
+  query = applyLotFilters(query, f);
   if (crit) query = query.eq('matches.criteria_id', crit);
 
   const [{ data, error }, { data: critData }, { data: rcData }] = await Promise.all([
@@ -87,6 +84,7 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
       region: l.region,
       area_sqm: l.area_sqm,
       asset: l.asset_type,
+      subtype: l.subtype,
       source: l.source,
       url: l.lot_url,
       bids_end: l.bids_end,
@@ -104,33 +102,13 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
 
       <form className="filters" method="get">
         <div className="row">
-          <div className="field">
-            <label>Джерело</label>
-            <select name="source" defaultValue={source}>
-              <option value="">Усі</option>
-              <option value="prozorro">Prozorro.Sale</option>
-              <option value="setam">СЕТАМ</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>Тип</label>
-            <select name="asset" defaultValue={asset}>
-              <option value="">Усі</option>
-              <option value="real_estate">Нерухомість</option>
-              <option value="land">Земля</option>
-              <option value="other">Інше</option>
-            </select>
-          </div>
+          <LotFilterFields f={f} />
           <div className="field">
             <label>Критерій</label>
             <select name="crit" defaultValue={crit}>
               <option value="">Будь-який</option>
               {criteria.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-          </div>
-          <div className="field">
-            <label>Регіон</label>
-            <input name="region" defaultValue={region} placeholder="напр. Київ" />
           </div>
           <div className="field check">
             <input id="m" type="checkbox" name="matched" value="1" defaultChecked={matchedOnly} />

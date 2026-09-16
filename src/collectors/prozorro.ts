@@ -1,7 +1,7 @@
 import { config } from '../config.js';
 import type { CollectResult, NormalizedLot } from '../types.js';
 import { fetchJson, type Collector } from './base.js';
-import { classifyAsset } from './classify.js';
+import { classifyAsset, classifySubtype } from './classify.js';
 
 /**
  * Колектор Prozorro.Sale (ЦБД-New, відкрите API).
@@ -146,6 +146,7 @@ export class ProzorroCollector implements Collector {
     // текст для класифікації включає описи класифікатора CAV (укр.)
     const classifyText = `${title} ${description} ${classDescr.join(' ')}`;
     const assetType = classifyAsset(sellingMethod, codes, classifyText);
+    const subtype = classifySubtype(assetType, classifyText);
 
     // ціна: стартова (value) та мін. крок як fallback
     const startPrice = num(a.value?.amount) ?? num(a.minimalStep?.amount) ?? null;
@@ -184,6 +185,7 @@ export class ProzorroCollector implements Collector {
       title: title || null,
       description: description || null,
       asset_type: assetType,
+      subtype,
       selling_method: sellingMethod,
       status: a.status ?? null,
       region,
