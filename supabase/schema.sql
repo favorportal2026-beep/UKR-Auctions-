@@ -30,6 +30,7 @@ create table if not exists lots (
   lat            double precision,
   lng            double precision,
   area_sqm       numeric,                         -- площа (м² або переведено)
+  cadastral_number text,                          -- кадастровий номер (для землі)
   image_url      text,                            -- перше фото (Prozorro illustration)
   start_price    numeric,
   current_price  numeric,
@@ -47,6 +48,7 @@ create table if not exists lots (
 
 create index if not exists idx_lots_asset_type   on lots (asset_type);
 create index if not exists idx_lots_subtype       on lots (subtype);
+create index if not exists idx_lots_cadastre      on lots (cadastral_number);
 create index if not exists idx_lots_region       on lots (region);
 create index if not exists idx_lots_status       on lots (status);
 create index if not exists idx_lots_bids_end     on lots (bids_end);

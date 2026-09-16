@@ -2,7 +2,7 @@ import { parse } from 'csv-parse/sync';
 import { config } from '../config.js';
 import type { CollectResult, NormalizedLot } from '../types.js';
 import { fetchText, type Collector } from './base.js';
-import { classifySetam, classifySubtype, isTracked } from './classify.js';
+import { classifySetam, classifySubtype, extractCadastre, isTracked } from './classify.js';
 
 /**
  * Колектор СЕТАМ (арештоване/конфісковане майно).
@@ -150,6 +150,7 @@ export class SetamCollector implements Collector {
         description: category || null,
         asset_type: assetType,
         subtype,
+        cadastral_number: extractCadastre(`${category} ${title}`),
         selling_method: 'setam',
         status: col.status ? r[col.status] : null,
         region: col.region ? r[col.region] : null,

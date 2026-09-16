@@ -145,6 +145,19 @@ function LotCard({ row }: { row: Row }) {
         {row.valuation != null ? <span>Оцінка: <b>{money(row.valuation, row.currency ?? 'UAH')}</b></span> : null}
         {row.bids_end ? <span>Заявки до: <b>{dateShort(row.bids_end)}</b></span> : null}
         {row.status ? <span>{row.status}</span> : null}
+        {row.cadastral_number ? (
+          <span>
+            Кадастр:{' '}
+            <a
+              href={`https://map.land.gov.ua/kadastrova-karta?cadnum=${encodeURIComponent(row.cadastral_number)}`}
+              target="_blank"
+              rel="noreferrer"
+              title="Відкрити ділянку в публічній кадастровій карті (ДЗК)"
+            >
+              <b>{row.cadastral_number}</b> ↗
+            </a>
+          </span>
+        ) : null}
       </div>
 
       {matched.length ? (
