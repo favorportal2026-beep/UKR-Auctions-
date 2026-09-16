@@ -94,10 +94,40 @@ function toIso(v: string | undefined): string | null {
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-/** Посилання на лот СЕТАМ за номером лота (публічний портал). */
-function setamLotUrl(id: string | null): string | null {
-  const n = (id ?? '').trim();
-  return /^\d+$/.test(n) ? `https://setam.net.ua/realization/${n}` : null;
+// У CSV немає URL, а сторінка лота — /auction/{ID_АУКЦІОНУ}, де ID ≠ «Номер лота».
+// Резолвимо URL зі списку торгів: там у кожній картці є і «Номер лоту», і лінк
+// /auction/{id}. Токени в порядку документа: спершу /auction/{id}, потім номер.
+const AUCTION_PAIR_RE = /auction\/(\d+)|Номер лоту:\s*<span>(\d+)<\/span>/g;
+const SETAM_LIST_MAX_PAGES = 45;
+
+/** Мапа «Номер лота» → URL сторінки /auction/{id}, зібрана зі списку торгів СЕТАМ. */
+async function resolveAuctionUrls(needed: Set<string>): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  for (let p = 1; p <= SETAM_LIST_MAX_PAGES && map.size < needed.size; p++) {
+    const url = p === 1 ? 'https://setam.net.ua/auctions' : `https://setam.net.ua/auctions/page/${p}`;
+    let html: string;
+    try {
+      html = await fetchText(url);
+    } catch (e) {
+      console.warn(`[setam] не вдалося прочитати список торгів (${url}):`, (e as Error).message);
+      break;
+    }
+    let last: string | null = null;
+    let pairsOnPage = 0;
+    for (const m of html.matchAll(AUCTION_PAIR_RE)) {
+      if (m[1]) {
+        last = m[1];
+      } else if (m[2] && last) {
+        pairsOnPage++;
+        if (needed.has(m[2]) && !map.has(m[2])) {
+          map.set(m[2], `https://setam.net.ua/auction/${last}`);
+        }
+      }
+    }
+    if (pairsOnPage === 0) break; // порожня/остання сторінка
+  }
+  console.log(`[setam] резолвлено URL: ${map.size}/${needed.size}`);
+  return map;
 }
 
 export class SetamCollector implements Collector {
@@ -145,7 +175,7 @@ export class SetamCollector implements Collector {
       lots.push({
         source: this.source,
         source_id: String(sourceId).trim(),
-        lot_url: (col.url ? r[col.url] : null) || setamLotUrl(rawId),
+        lot_url: (col.url ? r[col.url] : null) || null, // резолвимо нижче зі списку торгів
         title: title || null,
         description: category || null,
         asset_type: assetType,
@@ -167,6 +197,19 @@ export class SetamCollector implements Collector {
         bids_end: col.bidsEnd ? toIso(r[col.bidsEnd]) : null,
         raw: r,
       });
+    }
+
+    // Резолвимо посилання на сторінки лотів зі списку торгів (best-effort).
+    if (lots.length > 0) {
+      const needed = new Set(lots.map((l) => l.source_id).filter((n) => /^\d+$/.test(n)));
+      try {
+        const urls = await resolveAuctionUrls(needed);
+        for (const l of lots) {
+          if (!l.lot_url) l.lot_url = urls.get(l.source_id) ?? null;
+        }
+      } catch (e) {
+        console.warn('[setam] резолвінг URL пропущено:', (e as Error).message);
+      }
     }
 
     // СЕТАМ віддає повний CSV за один раз — пагінації немає (done=true).
