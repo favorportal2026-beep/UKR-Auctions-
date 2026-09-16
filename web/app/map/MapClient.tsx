@@ -12,9 +12,11 @@ const MapboxMap = dynamic(() => import('./MapboxMap'), {
 export default function MapClient({
   points,
   token,
+  selectedRegion,
 }: {
   points: MapPoint[];
   token: string | null;
+  selectedRegion?: string | null;
 }) {
-  return <MapboxMap points={points} token={token} />;
+  return <MapboxMap points={points} token={token} selectedRegion={selectedRegion} />;
 }
