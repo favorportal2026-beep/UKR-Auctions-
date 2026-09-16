@@ -279,4 +279,63 @@ input:focus, select:focus, textarea:focus { outline: 2px solid color-mix(in srgb
 .mapboxgl-popup-content a { color: #1f6f4a; }
 .mapboxgl-popup-tip { border-top-color: #fff !important; }
 
+/* Мобільний bottom-sheet мапи (лише <1024px) */
+.map-sheet { display: none; }
+@media (max-width: 1023px) {
+  .map-sheet {
+    display: flex; flex-direction: column;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 800;
+    background: var(--surface); border-top: 1px solid var(--line);
+    border-radius: 14px 14px 0 0; box-shadow: 0 -6px 20px rgba(0,0,0,.22);
+    max-height: 78dvh;
+  }
+  .map-sheet-head {
+    display: flex; align-items: center; justify-content: center; gap: 8px; position: relative;
+    padding: 10px 14px; border: 0; background: transparent; width: 100%;
+    font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer;
+  }
+  .map-sheet-grip { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 40px; height: 4px; border-radius: 3px; background: var(--line); }
+  .map-sheet-caret { position: absolute; right: 14px; color: var(--ink-dim); }
+  .map-sheet-list { display: none; overflow-y: auto; padding: 4px 10px 14px; }
+  .map-sheet.open .map-sheet-list { display: block; }
+  .map-sheet-row { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--line); background: transparent; padding: 10px 4px; cursor: pointer; }
+  .sheet-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex: 0 0 auto; }
+  .sheet-dot.c-realty { background: #e8620c; } .sheet-dot.c-land { background: #1f8f5a; } .sheet-dot.c-other { background: #6b6a63; }
+  .sheet-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .sheet-price { font-weight: 800; font-size: 14px; }
+  .sheet-title { font-size: 12.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 78vw; }
+  .sheet-region { font-size: 12px; color: var(--ink-dim); }
+}
+
+/* Бічна панель курації об'єкта */
+.drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 900; }
+.curation-drawer {
+  position: fixed; top: 0; right: 0; height: 100dvh; width: min(400px, 92vw); z-index: 901;
+  background: var(--surface); border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.25);
+  padding: 16px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+  animation: cd-in .18s ease-out;
+}
+@keyframes cd-in { from { transform: translateX(24px); opacity: .4; } to { transform: none; opacity: 1; } }
+.cd-head { display: flex; align-items: center; justify-content: space-between; }
+.cd-close { border: 0; background: transparent; font-size: 18px; cursor: pointer; color: var(--ink-dim); }
+.cd-photo { width: 100%; aspect-ratio: 16/10; object-fit: cover; border-radius: 10px; background: var(--surface-2); }
+.cd-price { font-size: 20px; font-weight: 800; margin-top: 4px; }
+.cd-title { font-size: 14px; line-height: 1.4; }
+.cd-region { font-size: 13px; color: var(--ink-dim); }
+.cd-cadastr { font-size: 12px; color: var(--ink-dim); font-family: ui-monospace, monospace; }
+.cd-section-label { font-size: 12px; font-weight: 700; color: var(--ink-dim); margin-top: 10px; text-transform: uppercase; letter-spacing: .03em; }
+.cd-statuses { display: flex; gap: 6px; flex-wrap: wrap; }
+.cd-status { flex: 1; min-width: 90px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 700; cursor: pointer; }
+.cd-status.active.s-review { background: #2b5c9b; border-color: #2b5c9b; color: #fff; }
+.cd-status.active.s-shortlist { background: #9a6b12; border-color: #9a6b12; color: #fff; }
+.cd-status.active.s-bidding { background: #1f6f4a; border-color: #1f6f4a; color: #fff; }
+.cd-note { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; resize: vertical; }
+.cd-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.cd-saved { color: var(--accent); font-size: 13px; font-weight: 700; }
+
+/* Бейджі статусу курації на картці */
+.badge.cur-review { background: #e8effa; color: #234a7d; border-color: #cddcf1; }
+.badge.cur-shortlist { background: #f7edd6; color: #6b4a0f; border-color: #ecdcb4; }
+.badge.cur-bidding { background: #dff0e7; color: #14543a; border-color: #bfe0cf; }
+
 .site-footer { border-top: 1px solid var(--line); color: var(--ink-dim); font-size: 12.5px; padding-block: 20px; margin-top: 30px; }
