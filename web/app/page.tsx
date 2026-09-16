@@ -4,11 +4,17 @@ import { ASSET_LABEL, SOURCE_LABEL, area, dateShort, discountLabel, money } from
 import { applyLotFilters, applyLotSort, parseLotFilters, SORT_OPTIONS, SUBTYPE_LABEL, type SP } from '@/lib/filters';
 import LotFilterFields from './components/LotFilterFields';
 import ViewSwitcher from './components/ViewSwitcher';
+import CurationDrawer, { STATUS_LABEL } from './components/CurationDrawer';
+import CurationButton from './components/CurationButton';
 import { hideLot, rematchAll, unhideLot } from './actions';
 
 export const dynamic = 'force-dynamic';
 
-type Row = Lot & { matches: { criteria_id: string; criteria: { id: string; name: string } | null }[] };
+type Row = Lot & {
+  matches: { criteria_id: string; criteria: { id: string; name: string } | null }[];
+  cur_status?: string | null;
+  cur_note?: string | null;
+};
 
 export default async function Dashboard({ searchParams }: { searchParams: SP }) {
   const sb = db();
@@ -30,9 +36,10 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
   if (crit) query = query.eq('matches.criteria_id', crit);
   if (!includeHidden) query = query.eq('hidden', false);
 
-  const [{ data: rowsData, error }, { data: critData }, stats] = await Promise.all([
+  const [{ data: rowsData, error }, { data: critData }, { data: curData }, stats] = await Promise.all([
     query,
     sb.from('criteria').select('*').order('name'),
+    sb.from('lot_curation').select('lot_id, status, note'),
     getStats(sb),
   ]);
   if (error) {
@@ -40,6 +47,19 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
   }
   const rows = (rowsData ?? []) as unknown as Row[];
   const criteria = (critData ?? []) as Criteria[];
+
+  // Прив'язуємо курацію (статус+нотатка) до рядків.
+  const curMap = new Map(
+    ((curData ?? []) as { lot_id: string; status: string | null; note: string | null }[]).map((c) => [
+      c.lot_id,
+      c,
+    ]),
+  );
+  for (const r of rows) {
+    const c = curMap.get(r.id);
+    r.cur_status = c?.status ?? null;
+    r.cur_note = c?.note ?? null;
+  }
 
   return (
     <main>
@@ -102,6 +122,8 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
           {rows.map((r) => <LotCard key={r.id} row={r} />)}
         </div>
       )}
+
+      <CurationDrawer />
     </main>
   );
 }
@@ -138,6 +160,9 @@ function LotCard({ row }: { row: Row }) {
           ) : null}
           <span className="badge">{SOURCE_LABEL[row.source] ?? row.source}</span>
           {disc ? <span className="badge disc">{disc}</span> : null}
+          {row.cur_status ? (
+            <span className={`badge cur cur-${row.cur_status}`}>{STATUS_LABEL[row.cur_status] ?? row.cur_status}</span>
+          ) : null}
         </div>
       </div>
 
@@ -177,9 +202,22 @@ function LotCard({ row }: { row: Row }) {
       ) : null}
 
       <div className="lot-actions">
+        <CurationButton
+          detail={{
+            id: row.id,
+            title: row.title ?? 'Без назви',
+            priceLabel: money(price, row.currency ?? 'UAH'),
+            region: row.region,
+            image: row.image_url,
+            url: row.lot_url,
+            cadastral: row.cadastral_number,
+            status: row.cur_status ?? '',
+            note: row.cur_note ?? '',
+          }}
+        />
         {row.lot_url ? (
           <a className="btn btn-ghost btn-sm" href={row.lot_url} target="_blank" rel="noreferrer">Відкрити лот ↗</a>
-        ) : <span className="muted" style={{ fontSize: 13 }}>без посилання</span>}
+        ) : null}
       </div>
     </article>
   );

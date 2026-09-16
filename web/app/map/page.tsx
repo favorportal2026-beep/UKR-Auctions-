@@ -10,6 +10,7 @@ import { OBLASTS, normalizeRegion } from '@/lib/geo/oblasts';
 import { applyLotFilters, parseLotFilters, type SP } from '@/lib/filters';
 import LotFilterFields from '../components/LotFilterFields';
 import ViewSwitcher from '../components/ViewSwitcher';
+import MapBottomSheet from './MapBottomSheet';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,6 +115,9 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
       <div className="map-box">
         <MapClient points={points} token={getMapboxToken()} selectedRegion={region || null} />
       </div>
+
+      {/* Мобільний bottom-sheet зі списком (на десктопі прихований) */}
+      <MapBottomSheet points={points} />
     </main>
   );
 }

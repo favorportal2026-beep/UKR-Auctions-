@@ -5,6 +5,19 @@ import { db } from '@/lib/supabase';
 import { matchAll } from '@/lib/match';
 import type { Criteria, Lot } from '@/lib/types';
 
+/** Зберегти курацію об'єкта: статус (review/shortlist/bidding/'') + нотатку. */
+export async function saveCuration(input: { lot_id: string; status: string; note: string }) {
+  const lot_id = String(input.lot_id ?? '');
+  if (!lot_id) return;
+  const status = input.status ? String(input.status) : null;
+  const note = input.note ? String(input.note) : null;
+  const { error } = await db()
+    .from('lot_curation')
+    .upsert({ lot_id, status, note, updated_at: new Date().toISOString() }, { onConflict: 'lot_id' });
+  if (error) throw new Error(error.message);
+  revalidatePath('/');
+}
+
 export async function hideLot(formData: FormData) {
   const id = String(formData.get('id') ?? '');
   if (!id) return;
