@@ -14,6 +14,7 @@ export default function ViewSwitcher() {
   function withParams(base: string, setView?: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.delete('view');
+    params.delete('page');
     if (setView) params.set('view', setView);
     const s = params.toString();
     return s ? `${base}?${s}` : base;

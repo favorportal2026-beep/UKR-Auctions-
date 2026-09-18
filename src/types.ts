@@ -65,4 +65,6 @@ export interface CollectResult {
   nextCursor?: string | null;
   /** true — більше сторінок немає (остання/єдина). Для пагінації у pipeline. */
   done?: boolean;
+  dataUrl?: string;
+  dataDate?: string | null;
 }

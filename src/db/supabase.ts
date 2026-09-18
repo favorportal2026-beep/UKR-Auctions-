@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { config } from '../config.js';
 import type { Criteria, LotSource, NormalizedLot } from '../types.js';
+import { isOpenLot } from '../collectors/status.js';
 
 let _client: SupabaseClient | null = null;
 
@@ -15,53 +16,55 @@ export function db(): SupabaseClient {
 
 /**
  * Upsert лотів за (source, source_id). Повертає лоти, які є НОВИМИ або в яких
- * змінилась ціна/статус — саме їх варто перевіряти на збіги/сповіщення.
+ * оновились поля. Збіги звіряємо для кожного збереженого лота.
  */
 export async function upsertLots(lots: NormalizedLot[]): Promise<{ id: string; lot: NormalizedLot; isNew: boolean }[]> {
-  if (lots.length === 0) return [];
   const client = db();
-  const changed: { id: string; lot: NormalizedLot; isNew: boolean }[] = [];
-
-  // Дізнаємось, що вже є (щоб визначити new vs changed).
-  const keys = lots.map((l) => l.source_id);
-  const source = lots[0]!.source;
-  const { data: existing } = await client
-    .from('lots')
-    .select('id, source_id, current_price, status')
-    .eq('source', source)
-    .in('source_id', keys);
-
-  const prev = new Map((existing ?? []).map((r) => [r.source_id, r]));
-
-  const now = new Date().toISOString();
-  // Координати не чіпаємо тут — ними керує геокодер (geocodeMissing), інакше
-  // повторний збір із порожнім lat/lng затер би вже знайдені координати.
-  const payload = lots.map(({ lat, lng, ...l }) => ({
-    ...l,
-    last_seen: now,
-    updated_at: now,
-  }));
-
-  const { data, error } = await client
-    .from('lots')
-    .upsert(payload, { onConflict: 'source,source_id' })
-    .select('id, source_id');
-
-  if (error) throw new Error(`upsertLots: ${error.message}`);
-
-  const idBySourceId = new Map((data ?? []).map((r) => [r.source_id, r.id]));
-
-  for (const l of lots) {
-    const before = prev.get(l.source_id);
-    const id = idBySourceId.get(l.source_id);
-    if (!id) continue;
-    if (!before) {
-      changed.push({ id, lot: l, isNew: true });
-    } else if (before.current_price !== l.current_price || before.status !== l.status) {
-      changed.push({ id, lot: l, isNew: false });
+  const result: { id: string; lot: NormalizedLot; isNew: boolean }[] = [];
+  const unique = [...new Map(lots.map(l => [l.source_id,l])).values()];
+  for (let offset = 0; offset < unique.length; offset += 250) {
+    const batch = unique.slice(offset, offset + 250);
+    const source = batch[0]!.source;
+    const { data: existing, error: readError } = await client.from('lots')
+      .select('id,source_id,lat,lng,lot_url').eq('source',source).in('source_id',batch.map(l => l.source_id));
+    if (readError) throw new Error(`upsertLots read: ${readError.message}`);
+    const prev = new Map((existing ?? []).map(r => [r.source_id,r]));
+    // Нові неактивні лоти не імпортуємо; наявні обов'язково оновлюємо до завершення.
+    const tracked = batch.filter(l => prev.has(l.source_id) || isOpenLot(l));
+    if (!tracked.length) continue;
+    const now = new Date().toISOString();
+    const payload = tracked.map(l => ({ ...l,
+      lat: l.lat ?? prev.get(l.source_id)?.lat ?? null,
+      lng: l.lng ?? prev.get(l.source_id)?.lng ?? null,
+      lot_url: l.lot_url ?? prev.get(l.source_id)?.lot_url ?? null,
+      last_seen: now,updated_at: now }));
+    const { data,error } = await client.from('lots').upsert(payload,{onConflict:'source,source_id'})
+      .select('id,source_id');
+    if (error) throw new Error(`upsertLots: ${error.message}`);
+    const ids = new Map((data ?? []).map(r => [r.source_id,r.id]));
+    for (const lot of tracked) {
+      const id = ids.get(lot.source_id);
+      if (id) result.push({id,lot,isNew:!prev.has(lot.source_id)});
     }
   }
-  return changed;
+  return result;
+}
+
+export async function rematchLots(ids?: string[]): Promise<{ inserted: number; deleted: number; total: number }> {
+  const {data,error} = await db().rpc('ua_rematch_lots',{p_lot_ids:ids ?? null});
+  if (error) throw new Error(`rematchLots: ${error.message}`);
+  return data;
+}
+
+export async function recordSync(source: LotSource, fields: Record<string,unknown>): Promise<void> {
+  const {error} = await db().from('sync_state').upsert({source,...fields},{onConflict:'source'});
+  if (error) throw new Error(`recordSync: ${error.message}`);
+}
+
+export async function syncState(source: LotSource) {
+  const {data,error}=await db().from('sync_state').select('*').eq('source',source).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 export async function getActiveCriteria(): Promise<Criteria[]> {
@@ -86,9 +89,11 @@ export async function getUnnotifiedMatches(): Promise<
 > {
   const { data, error } = await db()
     .from('matches')
-    .select('id, notified, lots(*), criteria(name)')
+    .select('id, notified, lots!inner(*), criteria!inner(name,active)')
     .eq('notified', false)
-    .limit(200);
+    .eq('lots.is_active',true).eq('lots.hidden',false).eq('criteria.active',true)
+    .or(`bids_end.is.null,bids_end.gt.${new Date().toISOString()}`,{foreignTable:'lots'})
+    .order('created_at').limit(200);
   if (error) throw new Error(`getUnnotifiedMatches: ${error.message}`);
   return (data ?? []).map((m: any) => ({
     match_id: m.id,
@@ -136,8 +141,8 @@ export async function setGeocodeCache(query: string, lat: number | null, lng: nu
 }
 
 export async function getCursor(source: LotSource): Promise<string | null> {
-  const { data } = await db().from('sync_state').select('cursor').eq('source', source).maybeSingle();
-  return data?.cursor ?? null;
+  const state=await syncState(source);
+  return state?.cursor ?? null;
 }
 
 export async function setCursor(source: LotSource, cursor: string | null): Promise<void> {

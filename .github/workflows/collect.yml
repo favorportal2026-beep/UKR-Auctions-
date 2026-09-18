@@ -3,18 +3,33 @@ name: collect
 # Планувальник збору лотів.
 #  • Prozorro — ЩОДНЯ 06:00 UTC: короткі приватизаційні/земельні вікна встигаємо
 #    застати в активному статусі (тижневий крок міг би їх пропустити). API легкий.
-#  • СЕТАМ — раз на тиждень (Пн 07:00 UTC): помісячний CSV важкий і оновлюється
-#    рідко, тому щодня його тягнути немає сенсу.
+#  • СЕТАМ — щодня 07:00 UTC: каталог CKAN автоматично обирає свіжий CSV.
 # Разові дозбори/backfill — вручну через "Run workflow" (можна задати джерело).
 # (Google Cloud Scheduler + Cloud Run — шлях масштабування, коли зросте обсяг.)
 on:
   schedule:
     - cron: '0 6 * * *' # Prozorro — щодня
-    - cron: '0 7 * * 1' # СЕТАМ — щотижня (понеділок)
+    - cron: '0 7 * * *' # СЕТАМ — щодня
   workflow_dispatch:
     inputs:
       source:
         description: 'Джерело: prozorro | setam | (порожньо = усі)'
+        required: false
+        default: ''
+      notify:
+        description: 'Надсилати Telegram-сповіщення'
+        type: boolean
+        default: true
+      geocode:
+        description: 'Геокодувати відсутні координати'
+        type: boolean
+        default: true
+      refresh_only:
+        description: 'Лише звірити статуси вже збережених Prozorro (без розсилки)'
+        type: boolean
+        default: false
+      setam_csv_url:
+        description: 'Необов’язковий CSV override для ручного запуску (порожньо = автовибір)'
         required: false
         default: ''
 
@@ -33,32 +48,44 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Яке джерело збирати: щоденний cron → лише Prozorro; тижневий (Пн) → лише
+      # Яке джерело збирати: щоденний cron → лише Prozorro; другий щоденний → лише
       # СЕТАМ; ручний запуск → значення input (порожнє = усі джерела).
       - name: Визначити джерело
         id: src
+        env:
+          SOURCE_INPUT: ${{ github.event.inputs.source }}
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            if [ "${{ github.event.schedule }}" = "0 7 * * 1" ]; then
+            if [ "${{ github.event.schedule }}" = "0 7 * * *" ]; then
               echo "source=setam" >> "$GITHUB_OUTPUT"
             else
               echo "source=prozorro" >> "$GITHUB_OUTPUT"
             fi
           else
-            echo "source=${{ github.event.inputs.source }}" >> "$GITHUB_OUTPUT"
+            echo "source=$SOURCE_INPUT" >> "$GITHUB_OUTPUT"
           fi
       - name: Збір
         run: |
+          if [ "$REFRESH_ONLY" = "true" ]; then
+            npm run refresh -- --limit=5000
+            exit 0
+          fi
+          args=()
+          if [ "$NOTIFY" = "false" ]; then args+=(--no-notify); fi
+          if [ "$GEOCODE" = "false" ]; then args+=(--no-geocode); fi
           if [ -n "${{ steps.src.outputs.source }}" ]; then
-            npm run collect -- --source=${{ steps.src.outputs.source }}
+            npm run collect -- --source=${{ steps.src.outputs.source }} "${args[@]}"
           else
-            npm run collect
+            npm run collect -- "${args[@]}"
           fi
         env:
+          NOTIFY: ${{ github.event.inputs.notify }}
+          GEOCODE: ${{ github.event.inputs.geocode }}
+          REFRESH_ONLY: ${{ github.event.inputs.refresh_only }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PROZORRO_API_BASE: ${{ secrets.PROZORRO_API_BASE }}
           PROZORRO_START_DATE: ${{ secrets.PROZORRO_START_DATE }}
-          SETAM_CSV_URL: ${{ secrets.SETAM_CSV_URL }}
+          SETAM_CSV_URL: ${{ github.event.inputs.setam_csv_url }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

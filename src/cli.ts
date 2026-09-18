@@ -1,4 +1,4 @@
-import { makeCollectors, notifyMatches, runPipeline } from './pipeline.js';
+import { makeCollectors, notifyMatches, refreshKnownProzorro, runPipeline } from './pipeline.js';
 import type { LotSource } from './types.js';
 
 /**
@@ -19,6 +19,13 @@ function flag(name: string): boolean {
 async function main() {
   const cmd = process.argv[2] ?? 'collect';
   const only = arg('source') as LotSource | undefined;
+  if (only && !['prozorro','setam'].includes(only)) throw new Error('Невідоме джерело');
+  if (cmd==='refresh') {
+    const limit=Number(arg('limit') ?? '200');
+    if (!Number.isInteger(limit)||limit<1) throw new Error('Некоректний ліміт оновлення');
+    await refreshKnownProzorro(limit);
+    return;
+  }
 
   if (cmd === 'match') {
     await notifyMatches();
@@ -42,7 +49,7 @@ async function main() {
       }
       return;
     }
-    await runPipeline({ only });
+    await runPipeline({ only, noNotify:flag('no-notify'),noGeocode:flag('no-geocode') });
     return;
   }
 

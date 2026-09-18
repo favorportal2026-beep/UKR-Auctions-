@@ -14,7 +14,9 @@
     "collect:setam": "tsx src/cli.ts collect --source=setam",
     "match": "tsx src/cli.ts match",
     "dry": "tsx src/cli.ts collect --dry-run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "refresh": "tsx src/cli.ts refresh",
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

@@ -29,6 +29,9 @@ export interface Lot {
   bids_end: string | null;
   hidden: boolean;
   updated_at: string;
+  is_active: boolean;
+  first_seen: string;
+  last_seen: string;
 }
 
 export interface Criteria {

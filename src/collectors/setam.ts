@@ -3,6 +3,8 @@ import { config } from '../config.js';
 import type { CollectResult, NormalizedLot } from '../types.js';
 import { fetchText, type Collector } from './base.js';
 import { classifySetam, classifySubtype, extractCadastre, isTracked } from './classify.js';
+import { discoverSetamResource } from './setam-resource.js';
+import { isActiveStatus } from './status.js';
 
 /**
  * Колектор СЕТАМ (арештоване/конфісковане майно).
@@ -135,12 +137,9 @@ export class SetamCollector implements Collector {
   constructor(private csvUrl = config.setam.csvUrl) {}
 
   async collect(_cursor: string | null): Promise<CollectResult> {
-    if (!this.csvUrl) {
-      console.warn('[setam] SETAM_CSV_URL не задано — пропускаю. Див. CLAUDE.md.');
-      return { source: this.source, lots: [], nextCursor: _cursor, done: true };
-    }
-
-    const csv = await fetchText(this.csvUrl);
+    const resource = await discoverSetamResource(this.csvUrl);
+    console.log(`[setam] CSV: ${resource.url}, дата=${resource.date ?? 'невідома'}`);
+    const csv = await fetchText(resource.url);
     const rows = parse(csv, {
       columns: true,
       skip_empty_lines: true,
@@ -148,10 +147,13 @@ export class SetamCollector implements Collector {
       bom: true,
     }) as Row[];
 
-    if (rows.length === 0) return { source: this.source, lots: [], nextCursor: _cursor, done: true };
+    if (rows.length === 0) throw new Error('СЕТАМ: CSV порожній, збір не підтверджено');
 
     const headers = Object.keys(rows[0]!);
     const col = resolveColumns(headers);
+    if (!col.id || !col.title || !col.status || !col.price) {
+      throw new Error(`СЕТАМ: відсутні обов'язкові колонки CSV: ${headers.join(', ')}`);
+    }
     console.log('[setam] заголовки CSV:', headers.join(' | '));
     console.log('[setam] мапінг колонок:', col);
 
@@ -201,7 +203,7 @@ export class SetamCollector implements Collector {
 
     // Резолвимо посилання на сторінки лотів зі списку торгів (best-effort).
     if (lots.length > 0) {
-      const needed = new Set(lots.map((l) => l.source_id).filter((n) => /^\d+$/.test(n)));
+      const needed = new Set(lots.filter(l => isActiveStatus(l.source,l.status)).map((l) => l.source_id).filter((n) => /^\d+$/.test(n)));
       try {
         const urls = await resolveAuctionUrls(needed);
         for (const l of lots) {
@@ -213,6 +215,7 @@ export class SetamCollector implements Collector {
     }
 
     // СЕТАМ віддає повний CSV за один раз — пагінації немає (done=true).
-    return { source: this.source, lots, nextCursor: new Date().toISOString(), done: true };
+    return { source: this.source, lots, nextCursor: new Date().toISOString(), done: true,
+      dataUrl: resource.url, dataDate: resource.date };
   }
 }

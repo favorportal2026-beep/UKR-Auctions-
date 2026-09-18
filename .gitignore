@@ -6,8 +6,11 @@ dist/
 .DS_Store
 /tmp/
 coverage/
+supabase/.temp/
 
 # Next.js (web/)
 .next/
 web/.next/
 next-env.d.ts
+.vercel
+.env*
