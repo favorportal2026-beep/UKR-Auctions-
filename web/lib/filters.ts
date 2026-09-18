@@ -62,7 +62,7 @@ export function applyLotSort<T>(query: T, sort: string): T {
     case 'discount':
       return q.order('price_to_valuation', { ascending: true, nullsFirst: false }) as T;
     default:
-      return q.order('updated_at', { ascending: false }) as T;
+      return q.order('first_seen', { ascending: false }) as T;
   }
 }
 

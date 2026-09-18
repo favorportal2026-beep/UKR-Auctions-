@@ -88,20 +88,24 @@ export async function refreshKnownProzorro(limit: number): Promise<void> {
     const {data,error}=await query;
     if (error) throw new Error(error.message);
     if (!data?.length) { await recordSync('prozorro',{refresh_cursor:null});break; }
-    // Невеликі групи обмежують навантаження на джерело.
-    for (let start=0;start<data.length;start+=3) {
-      const group=data.slice(start,start+3);
+    // Невеликі групи запитів до джерела; запис і matching один раз на сторінку.
+    const refreshedLots=[];
+    for (let start=0;start<data.length;start+=5) {
+      const group=data.slice(start,start+5);
       const lots=await Promise.all(group.map(async row=>{
         if (!row.internal_id) throw new Error(`Prozorro: відсутній внутрішній id ${row.source_id}`);
         const lot=await collector.getProcedure(String(row.internal_id));
         if (!lot || lot.source_id!==row.source_id) throw new Error(`Prozorro: процедура не відповідає ${row.source_id}`);
         return lot;
       }));
-      const stored=await upsertLots(lots);
-      if (stored.length) await rematchLots(stored.map(l=>l.id));
-      refreshed+=group.length;cursor=group[group.length-1]!.id;
-      await recordSync('prozorro',{refresh_cursor:cursor});
+      refreshedLots.push(...lots);
     }
+    const stored=await upsertLots(refreshedLots);
+    if (stored.length) await rematchLots(stored.map(l=>l.id));
+    refreshed+=data.length;cursor=data[data.length-1]!.id;
+    await recordSync('prozorro',{refresh_cursor:cursor});
+    console.log(`[refresh] перевірено ${refreshed}, cursor=${cursor}`);
+
   }
   console.log(`[refresh] перевірено Prozorro: ${refreshed}`);
 }

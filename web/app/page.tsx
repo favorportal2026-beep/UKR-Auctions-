@@ -30,7 +30,8 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
   const sort = searchParams.sort || 'new';
 
   const pageSize = 48;
-  const page = Math.max(1,Math.floor(Number(searchParams.page)||1));
+  const requestedPage=Number(searchParams.page);
+  const page=Number.isSafeInteger(requestedPage)&&requestedPage>0?requestedPage:1;
   const curationSelect = f.curation ? ', lot_curation!inner(status,note)' : ', lot_curation(status,note)';
   const needInner = matchedOnly || !!crit;
   const selectStr = needInner
