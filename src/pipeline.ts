@@ -84,7 +84,7 @@ export async function refreshKnownProzorro(limit: number): Promise<void> {
   let refreshed=0;
   const collector=new ProzorroCollector();
   while (refreshed<limit) {
-    let query=db().from('lots').select('id,source_id,internal_id:raw->>_id')
+    let query=db().from(config.tables.lots).select('id,source_id,internal_id:raw->>_id')
       .eq('source','prozorro').eq('is_active',true).order('id').limit(Math.min(100,limit-refreshed));
     if (cursor) query=query.gt('id',cursor);
     const {data,error}=await query;
