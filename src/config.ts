@@ -30,15 +30,11 @@ export const config = {
     // Стартова дата першого забору (далі рухається курсор із БД). Для «лише
     // активні» беремо недавнє вікно; за потреби глибше — задати PROZORRO_START_DATE.
     startDate: opt('PROZORRO_START_DATE', '2026-08-01'),
+    refreshLimit: Number(opt('PROZORRO_REFRESH_LIMIT','200')),
   },
   setam: {
-    // Дефолт — останній відомий помісячний CSV-ресурс СЕТАМ на data.gov.ua
-    // (dataset c360d1ef…, снапшот 2026-09). Оновлювати щомісяця новим resource URL
-    // або перевизначати через змінну SETAM_CSV_URL. Див. CLAUDE.md.
-    csvUrl: opt(
-      'SETAM_CSV_URL',
-      'https://data.gov.ua/dataset/c360d1ef-4eee-4158-812f-ede20c4cc943/resource/940e7a39-eaba-4532-a48a-edf7e0d3177c/download/auctions-14-09-2026.csv'
-    ),
+    // Порожньо = автоматичний вибір найсвіжішого CSV через каталог CKAN.
+    csvUrl: opt('SETAM_CSV_URL'),
   },
   telegram: {
     botToken: opt('TELEGRAM_BOT_TOKEN'),

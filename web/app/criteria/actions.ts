@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { requireAccess } from '@/lib/auth';
 import { db } from '@/lib/supabase';
 import type { AssetType } from '@/lib/types';
 
@@ -37,12 +38,14 @@ function payload(fd: FormData) {
 }
 
 export async function addCriterion(fd: FormData) {
+  requireAccess();
   const { error } = await db().from('criteria').insert(payload(fd));
   if (error) throw new Error(error.message);
   revalidatePath('/criteria');
 }
 
 export async function updateCriterion(fd: FormData) {
+  requireAccess();
   const id = String(fd.get('id') ?? '');
   if (!id) return;
   const { error } = await db().from('criteria').update(payload(fd)).eq('id', id);
@@ -52,6 +55,7 @@ export async function updateCriterion(fd: FormData) {
 }
 
 export async function deleteCriterion(fd: FormData) {
+  requireAccess();
   const id = String(fd.get('id') ?? '');
   if (!id) return;
   const { error } = await db().from('criteria').delete().eq('id', id);
@@ -61,6 +65,7 @@ export async function deleteCriterion(fd: FormData) {
 }
 
 export async function toggleActive(fd: FormData) {
+  requireAccess();
   const id = String(fd.get('id') ?? '');
   const active = fd.get('active') === '1';
   if (!id) return;

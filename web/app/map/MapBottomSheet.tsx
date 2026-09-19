@@ -12,7 +12,7 @@ export default function MapBottomSheet({ points }: { points: MapPoint[] }) {
   function focus(p: MapPoint) {
     window.dispatchEvent(
       new CustomEvent('favor-focus-lot', {
-        detail: { lat: p.lat, lng: p.lng, title: p.title, priceLabel: p.priceLabel, region: p.region, url: p.url },
+        detail: { id:p.id,approx:p.approx,lat: p.lat, lng: p.lng, title: p.title, priceLabel: p.priceLabel, region: p.region, url: p.url },
       }),
     );
     setOpen(false); // згорнути, щоб побачити мапу

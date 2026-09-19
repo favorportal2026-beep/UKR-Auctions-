@@ -1,3 +1,6 @@
+import CurationDrawer from '../components/CurationDrawer';
+import SyncStatus from '../components/SyncStatus';
+import { readAllRows } from '@/lib/pagination';
 import { db } from '@/lib/supabase';
 import type { Criteria, Lot } from '@/lib/types';
 import { money, moneyCompact } from '@/lib/format';
@@ -22,28 +25,28 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
   const matchedOnly = searchParams.matched === '1';
 
   const needInner = matchedOnly || !!crit;
-  const selectStr = needInner ? '*, matches!inner(criteria_id)' : '*';
+  const fields='id,lat,lng,title,current_price,start_price,currency,source,region,address,asset_type,lot_url,is_active,bids_end';
+  const selectStr=needInner?fields+',matches!inner(criteria_id)':fields;
 
-  let query = sb.from('lots').select(selectStr).eq('hidden', false).limit(2000);
-  query = applyLotFilters(query, f);
-  if (crit) query = query.eq('matches.criteria_id', crit);
-
-  const [{ data, error }, { data: critData }, { data: rcData }] = await Promise.all([
-    query,
-    sb.from('criteria').select('*').order('name'),
-    sb.rpc('region_counts'),
-  ]);
-  if (error) {
-    return <div className="notice">Помилка доступу до бази: {error.message}.</div>;
+  const curationSelect=f.curation?',lot_curation!inner(status)':'';
+  function lotQuery() {
+    let query=sb.from('lots').select(selectStr+curationSelect,{count:'exact'}).eq('hidden',false);
+    query=applyLotFilters(query,f);
+    if (crit) query=query.eq('matches.criteria_id',crit);
+    return query.order('id');
   }
-  const lots = (data ?? []) as unknown as Lot[];
-  const criteria = (critData ?? []) as Criteria[];
+  const [lots,{data:critData,error:critError}]=await Promise.all([
+    readAllRows<Lot>((from,to)=>lotQuery().range(from,to)),
+    sb.from('criteria').select('*').order('name'),
+  ]);
+  if (critError) throw new Error(critError.message);
+  const criteria=(critData ?? []) as Criteria[];
 
   // Лічильники по областях: зводимо «сирі» region до стему й сумуємо.
   const countByStem = new Map<string, number>();
-  for (const row of (rcData ?? []) as { region: string; n: number }[]) {
+  for (const row of lots) {
     const stem = normalizeRegion(row.region);
-    if (stem) countByStem.set(stem, (countByStem.get(stem) ?? 0) + Number(row.n));
+    if (stem) countByStem.set(stem, (countByStem.get(stem) ?? 0) + 1);
   }
   const regionItems: RegionItem[] = OBLASTS.map((o) => ({
     stem: o.stem,
@@ -83,6 +86,7 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
         <span className="muted">На мапі: {points.length}{noGeo ? ` · без гео: ${noGeo}` : ''}</span>
       </div>
 
+      <SyncStatus />
       <form className="filters" method="get">
         <div className="row">
           <LotFilterFields f={f} />
@@ -113,11 +117,12 @@ export default async function MapPage({ searchParams }: { searchParams: SP }) {
       <RegionPanel items={regionItems} selected={region || null} />
 
       <div className="map-box">
-        <MapClient points={points} token={getMapboxToken()} selectedRegion={region || null} />
+        <MapClient points={points} token={getMapboxToken()} selectedRegion={region || null} focusId={searchParams.focus ?? null} />
       </div>
 
       {/* Мобільний bottom-sheet зі списком (на десктопі прихований) */}
       <MapBottomSheet points={points} />
+      <CurationDrawer />
     </main>
   );
 }

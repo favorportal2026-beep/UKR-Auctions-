@@ -13,10 +13,12 @@ export default function MapClient({
   points,
   token,
   selectedRegion,
+  focusId,
 }: {
   points: MapPoint[];
   token: string | null;
   selectedRegion?: string | null;
+  focusId?: string | null;
 }) {
-  return <MapboxMap points={points} token={token} selectedRegion={selectedRegion} />;
+  return <MapboxMap points={points} token={token} selectedRegion={selectedRegion} focusId={focusId} />;
 }

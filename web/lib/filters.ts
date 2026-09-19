@@ -62,7 +62,7 @@ export function applyLotSort<T>(query: T, sort: string): T {
     case 'discount':
       return q.order('price_to_valuation', { ascending: true, nullsFirst: false }) as T;
     default:
-      return q.order('updated_at', { ascending: false }) as T;
+      return q.order('first_seen', { ascending: false }) as T;
   }
 }
 
@@ -78,6 +78,8 @@ export type LotFilters = {
   areaMax: number | null;
   deadline: string; // '' | '1' | '3' | '7'
   cadastr: string; // кадастровий номер (частковий збіг)
+  availability: 'active' | 'archive' | 'all';
+  curation: string;
 };
 
 function num(v: string | undefined): number | null {
@@ -99,6 +101,8 @@ export function parseLotFilters(sp: SP): LotFilters {
     areaMax: num(sp.area_max),
     deadline: sp.deadline || '',
     cadastr: (sp.cadastr || '').trim(),
+    availability: sp.availability === 'archive' ? 'archive' : sp.availability === 'all' ? 'all' : 'active',
+    curation: ['review','shortlist','bidding'].includes(sp.curation ?? '') ? sp.curation! : '',
   };
 }
 
@@ -109,11 +113,19 @@ export function parseLotFilters(sp: SP): LotFilters {
 export function applyLotFilters<T>(query: T, f: LotFilters): T {
   // supabase-js повертає той самий билдер із кожного методу; типізуємо через any.
   let q = query as any;
+  const now = new Date().toISOString();
+  if (f.availability === 'active') q = q.eq('is_active',true).or(`bids_end.is.null,bids_end.gt.${now}`);
+  if (f.availability === 'archive') q = q.or(`is_active.eq.false,bids_end.lte.${now}`);
+  if (f.curation) q = q.eq('lot_curation.status',f.curation);
   if (f.source) q = q.eq('source', f.source);
   if (f.asset) q = q.eq('asset_type', f.asset);
   if (f.subtype) q = q.eq('subtype', f.subtype);
   if (f.region) q = q.ilike('region', `%${f.region}%`);
-  if (f.q) q = q.or(`title.ilike.%${f.q}%,description.ilike.%${f.q}%`);
+  if (f.q) {
+    // Цитований літерал не дозволяє комам/дужкам змінити синтаксис PostgREST.
+    const term = JSON.stringify(`%${f.q.replace(/[%_]/g,'\\$&')}%`);
+    q = q.or(`title.ilike.${term},description.ilike.${term},source_id.ilike.${term}`);
+  }
   if (f.cadastr) q = q.ilike('cadastral_number', `%${f.cadastr}%`);
   if (f.priceMin != null) q = q.gte('current_price', f.priceMin);
   if (f.priceMax != null) q = q.lte('current_price', f.priceMax);

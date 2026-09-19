@@ -38,3 +38,8 @@ export function isSaleMethod(sellingMethod: string | null | undefined): boolean 
   if (!m) return true; // невідомий метод не відкидаємо (страховка)
   return !m.includes('lease') && !m.includes('rental');
 }
+
+/** Збіги й активна видача — лише поки можна подати заявку. */
+export function isOpenLot(lot: { source: LotSource; status?: string | null; bids_end?: string | null }, now = Date.now()): boolean {
+  return isActiveStatus(lot.source,lot.status) && (!lot.bids_end || Date.parse(lot.bids_end) > now);
+}

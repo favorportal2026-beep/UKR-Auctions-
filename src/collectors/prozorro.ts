@@ -116,7 +116,11 @@ export class ProzorroCollector implements Collector {
     return { source: this.source, lots, nextCursor, done };
   }
 
-  private normalize(a: any): NormalizedLot | null {
+  async getProcedure(id: string): Promise<NormalizedLot | null> {
+    return this.normalize(await fetchJson(`${this.apiBase}/procedures/${encodeURIComponent(id)}`));
+  }
+
+  normalize(a: any): NormalizedLot | null {
     if (!a || typeof a !== 'object') return null;
     const sourceId: string | undefined = a.auctionId ?? a._id ?? a.id ?? a.lotId;
     if (!sourceId) return null;

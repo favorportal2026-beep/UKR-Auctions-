@@ -1,12 +1,16 @@
+import Link from 'next/link';
+import Pagination from './components/Pagination';
+import SyncStatus from './components/SyncStatus';
 import { db } from '@/lib/supabase';
 import type { Criteria, Lot } from '@/lib/types';
 import { ASSET_LABEL, SOURCE_LABEL, area, dateShort, discountLabel, money } from '@/lib/format';
 import { applyLotFilters, applyLotSort, parseLotFilters, SORT_OPTIONS, SUBTYPE_LABEL, type SP } from '@/lib/filters';
 import LotFilterFields from './components/LotFilterFields';
 import ViewSwitcher from './components/ViewSwitcher';
-import CurationDrawer, { STATUS_LABEL } from './components/CurationDrawer';
+import CurationDrawer from './components/CurationDrawer';
 import CurationButton from './components/CurationButton';
 import { hideLot, rematchAll, unhideLot } from './actions';
+import { STATUS_LABEL } from '@/lib/curation';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +18,7 @@ type Row = Lot & {
   matches: { criteria_id: string; criteria: { id: string; name: string } | null }[];
   cur_status?: string | null;
   cur_note?: string | null;
+  lot_curation: {status:string|null;note:string|null}|null;
 };
 
 export default async function Dashboard({ searchParams }: { searchParams: SP }) {
@@ -25,21 +30,25 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
   const view = searchParams.view === 'list' ? 'list' : 'grid';
   const sort = searchParams.sort || 'new';
 
+  const pageSize = 48;
+  const requestedPage=Number(searchParams.page);
+  const page=Number.isSafeInteger(requestedPage)&&requestedPage>0?requestedPage:1;
+  const curationSelect = f.curation ? ', lot_curation!inner(status,note)' : ', lot_curation(status,note)';
   const needInner = matchedOnly || !!crit;
   const selectStr = needInner
     ? '*, matches!inner(criteria_id, criteria(id,name))'
     : '*, matches(criteria_id, criteria(id,name))';
 
-  let query = sb.from('lots').select(selectStr).limit(300);
+  let query = sb.from('lots').select(selectStr+curationSelect,{count:'exact'});
   query = applyLotFilters(query, f);
   query = applyLotSort(query, sort);
   if (crit) query = query.eq('matches.criteria_id', crit);
   if (!includeHidden) query = query.eq('hidden', false);
 
-  const [{ data: rowsData, error }, { data: critData }, { data: curData }, stats] = await Promise.all([
+  query = query.order('id').range((page-1)*pageSize,page*pageSize-1);
+  const [{ data: rowsData, error, count }, { data: critData }, stats] = await Promise.all([
     query,
     sb.from('criteria').select('*').order('name'),
-    sb.from('lot_curation').select('lot_id, status, note'),
     getStats(sb),
   ]);
   if (error) {
@@ -48,17 +57,9 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
   const rows = (rowsData ?? []) as unknown as Row[];
   const criteria = (critData ?? []) as Criteria[];
 
-  // Прив'язуємо курацію (статус+нотатка) до рядків.
-  const curMap = new Map(
-    ((curData ?? []) as { lot_id: string; status: string | null; note: string | null }[]).map((c) => [
-      c.lot_id,
-      c,
-    ]),
-  );
   for (const r of rows) {
-    const c = curMap.get(r.id);
-    r.cur_status = c?.status ?? null;
-    r.cur_note = c?.note ?? null;
+    r.cur_status = r.lot_curation?.status ?? null;
+    r.cur_note = r.lot_curation?.note ?? null;
   }
 
   return (
@@ -73,14 +74,16 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
         </form>
       </div>
 
+      <SyncStatus />
       <section className="stats">
-        <Stat n={stats.visible} l="Лотів (видимих)" />
+        <Stat n={stats.visible} l="Активних лотів" />
         <Stat n={stats.land} l="Земля" />
         <Stat n={stats.realty} l="Нерухомість" />
         <Stat n={stats.matches} l="Збігів" />
       </section>
 
       <form className="filters" method="get">
+        <input type="hidden" name="view" value={view} />
         <div className="row">
           <LotFilterFields f={f} />
           <div className="field">
@@ -123,6 +126,7 @@ export default async function Dashboard({ searchParams }: { searchParams: SP }) 
         </div>
       )}
 
+      <Pagination page={page} total={count ?? 0} pageSize={pageSize} params={searchParams} />
       <CurationDrawer />
     </main>
   );
@@ -166,11 +170,7 @@ function LotCard({ row }: { row: Row }) {
         </div>
       </div>
 
-      <h3>
-        {row.lot_url ? (
-          <a href={row.lot_url} target="_blank" rel="noreferrer">{row.title ?? 'Без назви'}</a>
-        ) : (row.title ?? 'Без назви')}
-      </h3>
+      <h3><Link href={`/lots/${row.id}`}>{row.title ?? 'Без назви'}</Link></h3>
 
       <div className="price">{money(price, row.currency ?? 'UAH')}</div>
 
@@ -254,9 +254,9 @@ function ErrorBox({ message }: { message: string }) {
 async function getStats(sb: ReturnType<typeof db>) {
   const head = { count: 'exact' as const, head: true };
   const [visible, land, realty, matches] = await Promise.all([
-    sb.from('lots').select('*', head).eq('hidden', false),
-    sb.from('lots').select('*', head).eq('hidden', false).eq('asset_type', 'land'),
-    sb.from('lots').select('*', head).eq('hidden', false).eq('asset_type', 'real_estate'),
+    sb.from('lots').select('*', head).eq('hidden', false).eq('is_active',true).or(`bids_end.is.null,bids_end.gt.${new Date().toISOString()}`),
+    sb.from('lots').select('*', head).eq('hidden', false).eq('is_active',true).or(`bids_end.is.null,bids_end.gt.${new Date().toISOString()}`).eq('asset_type', 'land'),
+    sb.from('lots').select('*', head).eq('hidden', false).eq('is_active',true).or(`bids_end.is.null,bids_end.gt.${new Date().toISOString()}`).eq('asset_type', 'real_estate'),
     sb.from('matches').select('*', head),
   ]);
   return {

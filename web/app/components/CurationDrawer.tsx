@@ -1,7 +1,10 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
-import { saveCuration } from '../actions';
+import { useEffect, useRef, useState } from 'react';
+import { loadCuration, saveCuration } from '../actions';
+import { STATUS_LABEL } from '@/lib/curation';
+
+export { STATUS_LABEL } from '@/lib/curation';
 
 export type CurationDetail = {
   id: string;
@@ -21,14 +24,8 @@ const STATUSES: { value: string; label: string }[] = [
   { value: 'bidding', label: 'Торгуюсь' },
 ];
 
-export const STATUS_LABEL: Record<string, string> = {
-  review: 'Розглянути',
-  shortlist: 'Шорт-ліст',
-  bidding: 'Торгуюсь',
-};
-
 // Відкриття панелі — подією (одна панель на сторінку; кнопки на картках шлють подію).
-export function openCuration(detail: CurationDetail) {
+export function openCuration(detail: CurationDetail | {id:string}) {
   window.dispatchEvent(new CustomEvent('open-curation', { detail }));
 }
 
@@ -37,31 +34,48 @@ export default function CurationDrawer() {
   const [status, setStatus] = useState('');
   const [note, setNote] = useState('');
   const [saved, setSaved] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const [error,setError]=useState('');
+  const [loading,setLoading]=useState(false);
+  const generation=useRef(0);
+  const [pending,setPending]=useState(false);
 
   useEffect(() => {
-    function onOpen(e: Event) {
-      const detail = (e as CustomEvent).detail as CurationDetail;
-      setD(detail);
-      setStatus(detail.status || '');
-      setNote(detail.note || '');
-      setSaved(false);
+    async function onOpen(e: Event) {
+      const detail=(e as CustomEvent).detail as {id:string};
+      const current=++generation.current;
+      setLoading(true);setError('');setSaved(false);setPending(false);setD(null);
+      try {
+        const loaded=await loadCuration(detail.id);
+        if (generation.current!==current) return;
+        setD(loaded);setStatus(loaded.status);setNote(loaded.note);
+      } catch {
+        if (generation.current===current) setError('Не вдалося завантажити об’єкт. Спробуйте ще раз.');
+      } finally { if (generation.current===current) setLoading(false); }
     }
-    window.addEventListener('open-curation', onOpen as EventListener);
-    return () => window.removeEventListener('open-curation', onOpen as EventListener);
+    function onClick(e:MouseEvent) {
+      const button=(e.target as Element).closest('[data-curation]');
+      const id=button?.getAttribute('data-curation');
+      if (id) openCuration({id});
+    }
+    function onKey(e:KeyboardEvent) { if (e.key==='Escape') close(); }
+    window.addEventListener('open-curation',onOpen);
+    document.addEventListener('click',onClick);
+    window.addEventListener('keydown',onKey);
+    return ()=>{generation.current++;window.removeEventListener('open-curation',onOpen);document.removeEventListener('click',onClick);window.removeEventListener('keydown',onKey);};
   }, []);
 
-  function close() {
-    setD(null);
-  }
+  function close() { generation.current++;setD(null);setLoading(false);setPending(false);setError(''); }
 
-  function persist(nextStatus: string, nextNote: string) {
+  async function persist(nextStatus: string, nextNote: string) {
     if (!d) return;
-    setSaved(false);
-    startTransition(async () => {
-      await saveCuration({ lot_id: d.id, status: nextStatus, note: nextNote });
-      setSaved(true);
-    });
+    setSaved(false);setError('');
+    const current=generation.current;
+    setPending(true);
+      try {
+        await saveCuration({lot_id:d.id,status:nextStatus,note:nextNote});
+        if (current===generation.current) setSaved(true);
+      } catch { if (current===generation.current) setError('Не вдалося зберегти. Спробуйте ще раз.'); }
+      finally {if (current===generation.current) setPending(false);}
   }
 
   function pickStatus(v: string) {
@@ -70,12 +84,16 @@ export default function CurationDrawer() {
     persist(next, note);
   }
 
-  if (!d) return null;
+  if (!d) return loading || error ? <>
+    <div className="drawer-backdrop" onClick={close}/><aside className="curation-drawer" role="dialog" aria-modal="true" aria-label="Курація об’єкта">
+      <button type="button" className="cd-close" onClick={close} aria-label="Закрити">✕</button>
+      <p role="status">{loading?'Завантаження…':error}</p>
+    </aside></> : null;
 
   return (
     <>
       <div className="drawer-backdrop" onClick={close} />
-      <aside className="curation-drawer" role="dialog" aria-label="Курація об'єкта">
+      <aside className="curation-drawer" role="dialog" aria-modal="true" aria-label="Курація об'єкта">
         <div className="cd-head">
           <strong>Об'єкт</strong>
           <button type="button" className="cd-close" onClick={close} aria-label="Закрити">
@@ -100,6 +118,7 @@ export default function CurationDrawer() {
               key={s.value}
               type="button"
               className={`cd-status s-${s.value}${status === s.value ? ' active' : ''}`}
+              disabled={pending}
               onClick={() => pickStatus(s.value)}
             >
               {s.label}
@@ -115,11 +134,13 @@ export default function CurationDrawer() {
           placeholder="Ваші думки, ціна-стеля, ризики, контакти…"
           rows={6}
         />
+        {error && <p role="alert" className="err">{error}</p>}
         <div className="cd-actions">
           <button type="button" className="btn btn-primary btn-sm" onClick={() => persist(status, note)} disabled={pending}>
             {pending ? 'Збереження…' : 'Зберегти нотатку'}
           </button>
           {saved && !pending ? <span className="cd-saved">✓ Збережено</span> : null}
+          <a className="btn btn-sm" href={`/lots/${d.id}`}>Деталі об’єкта</a>
           {d.url ? (
             <a className="btn btn-sm" href={d.url} target="_blank" rel="noreferrer">
               Відкрити лот ↗

@@ -84,24 +84,30 @@ function toFeatureCollection(points: MapPoint[]): GeoJSON.FeatureCollection {
   };
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+}
+
 function popupHtml(p: {
+  id: string;
   priceLabel: string;
   title: string;
   region: string | null;
   approx: number;
   url: string | null;
 }): string {
-  const region = p.region ?? '—';
+  const region = escapeHtml(p.region ?? '—');
   const approx = p.approx ? ' · орієнтовно (центр області)' : '';
   const link = p.url
-    ? `<a href="${p.url}" target="_blank" rel="noreferrer" style="font-size:13px;font-weight:700;color:#1f6f4a">Відкрити лот ↗</a>`
+    && /^https?:\/\//i.test(p.url) ? `<a href="${escapeHtml(p.url)}" target="_blank" rel="noreferrer" style="font-size:13px;font-weight:700;color:#1f6f4a">Відкрити лот ↗</a>`
     : '';
   return (
     `<div style="min-width:190px">` +
-    `<div style="font-weight:800;font-size:15px;margin-bottom:4px">${p.priceLabel}</div>` +
-    `<div style="font-size:13px;line-height:1.35;margin-bottom:6px">${p.title}</div>` +
+    `<div style="font-weight:800;font-size:15px;margin-bottom:4px">${escapeHtml(p.priceLabel)}</div>` +
+    `<div style="font-size:13px;line-height:1.35;margin-bottom:6px">${escapeHtml(p.title)}</div>` +
     `<div style="font-size:12px;color:#666;margin-bottom:6px">${region}${approx}</div>` +
-    link +
+    `<button type="button" data-curation="${escapeHtml(p.id)}" class="btn btn-sm">Статус і нотатки</button><br/>` +
+    `<a href="/lots/${encodeURIComponent(p.id)}">Деталі об’єкта</a><br/>` + link +
     `</div>`
   );
 }
@@ -110,16 +116,20 @@ export default function MapboxMap({
   points,
   token,
   selectedRegion = null,
+  focusId = null,
 }: {
   points: MapPoint[];
   token: string | null;
   selectedRegion?: string | null;
+  focusId?: string | null;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const pointsRef = useRef<MapPoint[]>(points);
   const oblastsRef = useRef<GeoJSON.FeatureCollection | null>(null);
+  const oblastHandlers=useRef<mapboxgl.Map|null>(null);
+  const clusterHandlers=useRef<mapboxgl.Map|null>(null);
   const selectedRegionRef = useRef<string | null>(selectedRegion);
   const [style, setStyle] = useState<MapboxBaseStyle>(defaultMapboxBaseStyle);
 
@@ -141,6 +151,9 @@ export default function MapboxMap({
     const qs = params.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname);
   }
+
+  const toggleRegionRef=useRef(toggleRegion);
+  toggleRegionRef.current=toggleRegion;
 
   // Ініціалізація мапи (один раз).
   useEffect(() => {
@@ -226,6 +239,8 @@ export default function MapboxMap({
     function onFocus(e: Event) {
       const map = mapRef.current;
       const d = (e as CustomEvent).detail as {
+        id:string;
+        approx?:boolean;
         lat: number;
         lng: number;
         title: string;
@@ -238,13 +253,22 @@ export default function MapboxMap({
       new mapboxgl.Popup({ offset: 16, closeButton: true })
         .setLngLat([d.lng, d.lat])
         .setHTML(
-          popupHtml({ priceLabel: d.priceLabel, title: d.title, region: d.region, approx: 0, url: d.url }),
+          popupHtml({id:d.id,priceLabel:d.priceLabel,title:d.title,region:d.region,approx:d.approx?1:0,url:d.url}),
         )
         .addTo(map);
     }
     window.addEventListener('favor-focus-lot', onFocus as EventListener);
     return () => window.removeEventListener('favor-focus-lot', onFocus as EventListener);
   }, []);
+
+  useEffect(() => {
+    const map=mapRef.current;
+    const point=points.find(p=>p.id===focusId);
+    if (!map || !point) return;
+    const focus=()=>window.dispatchEvent(new CustomEvent('favor-focus-lot',{detail:point}));
+    if (map.loaded()) focus(); else map.once('load',focus);
+    return ()=>{map.off('load',focus);};
+  },[focusId,points,token]);
 
   // Полігони областей: заливка (клік = фільтр) + обведення. Під кластерами.
   function addOblastLayer(map: mapboxgl.Map) {
@@ -278,6 +302,8 @@ export default function MapboxMap({
         below,
       );
     }
+    if (oblastHandlers.current===map) return;
+    oblastHandlers.current=map;
     map.on('click', OBLAST_FILL, (e) => {
       // Якщо під курсором кластер — хай виграє він (зум), а не фільтр області.
       if (
@@ -287,7 +313,7 @@ export default function MapboxMap({
         return;
       }
       const region = e.features?.[0]?.properties?.region;
-      if (typeof region === 'string' && region) toggleRegion(region);
+      if (typeof region === 'string' && region) toggleRegionRef.current(region);
     });
     map.on('mouseenter', OBLAST_FILL, () => (map.getCanvas().style.cursor = 'pointer'));
     map.on('mouseleave', OBLAST_FILL, () => (map.getCanvas().style.cursor = ''));
@@ -353,6 +379,8 @@ export default function MapboxMap({
     }
 
     // Клік по кластеру → наблизити.
+    if (clusterHandlers.current===map) return;
+    clusterHandlers.current=map;
     map.on('click', CLUSTER_LAYER, (e) => {
       const f = map.queryRenderedFeatures(e.point, { layers: [CLUSTER_LAYER] })[0];
       const clusterId = f?.properties?.cluster_id;
@@ -397,7 +425,7 @@ export default function MapboxMap({
         .setPopup(
           new mapboxgl.Popup({ offset: 16, closeButton: false }).setHTML(
             popupHtml({
-              priceLabel: String(props.priceLabel ?? ''),
+              id,              priceLabel: String(props.priceLabel ?? ''),
               title: String(props.title ?? ''),
               region: (props.region as string) ?? null,
               approx: Number(props.approx) || 0,

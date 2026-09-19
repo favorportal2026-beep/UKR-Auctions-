@@ -6,6 +6,19 @@ export default function LotFilterFields({ f }: { f: LotFilters }) {
   return (
     <>
       <div className="field">
+        <label>Доступність</label>
+        <select name="availability" defaultValue={f.availability}>
+          <option value="active">Активні</option><option value="archive">Архів</option><option value="all">Усі</option>
+        </select>
+      </div>
+      <div className="field">
+        <label>Статус відбору</label>
+        <select name="curation" defaultValue={f.curation}>
+          <option value="">Будь-який</option><option value="review">Розглянути</option>
+          <option value="shortlist">Шорт-ліст</option><option value="bidding">Торгуюсь</option>
+        </select>
+      </div>
+      <div className="field">
         <label>Джерело</label>
         <select name="source" defaultValue={f.source}>
           <option value="">Усі</option>
