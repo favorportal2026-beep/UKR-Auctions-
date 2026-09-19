@@ -1,5 +1,11 @@
 # Аукціони.UA
 
+> ⚠️ **Архів. Проєкт переїхав у портал RONDA.**
+> Увесь код (веб-розділ `/auctions` + збирач `collector/`) і активний збір тепер
+> у монорепозиторії **`favorportal2026-beep/ronda-portal`**, дані — у проєкті
+> Supabase RONDA (таблиці `auction_*`). Автоматичний cron тут вимкнено.
+> Розвивати далі — в `ronda-portal`.
+
 Моніторинг продажу нерухомості та землі України з Prozorro.Sale й СЕТАМ.
 TypeScript / Node 22, Supabase, Telegram, Next.js 14 і Mapbox.
 

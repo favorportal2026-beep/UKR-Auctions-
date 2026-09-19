@@ -53,6 +53,30 @@ export const config = {
     // 20-хв таймаут воркфлоу). Досить, щоб тижневий інкремент наздогнав дельту.
     maxPages: Number(opt('COLLECT_MAX_PAGES', '200')),
   },
+  // Набір таблиць у Supabase. `legacy` (типово) — історичні `lots`/`matches`/…
+  // окремого standalone-проєкту. `ronda` — таблиці порталу RONDA (`auction_*`,
+  // курсор у `auction_cursors`). Для переїзду в RONDA виставити
+  // AUCTIONS_TABLE_SET=ronda РАЗОМ із перенаправленням SUPABASE_URL/
+  // SUPABASE_SERVICE_ROLE_KEY на проєкт RONDA. RPC (ua_rematch_lots) живе в
+  // кожній БД під тією самою назвою, але працює над своїм набором таблиць —
+  // тому його ім'я не залежить від набору. Схему auction_* тримати дзеркалом
+  // цієї (той самий is_active/курсорні колонки/RPC), див. supabase/schema.sql.
+  tables:
+    opt('AUCTIONS_TABLE_SET', 'legacy') === 'ronda'
+      ? {
+          lots: 'auction_lots',
+          criteria: 'auction_criteria',
+          matches: 'auction_matches',
+          geocode: 'auction_geocode_cache',
+          cursors: 'auction_cursors',
+        }
+      : {
+          lots: 'lots',
+          criteria: 'criteria',
+          matches: 'matches',
+          geocode: 'geocode_cache',
+          cursors: 'sync_state',
+        },
 };
 
 /** Конфіг для дій, що не пишуть у БД/Telegram (dry-run) — не вимагає всіх ключів. */
