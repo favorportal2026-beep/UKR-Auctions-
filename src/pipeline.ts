@@ -16,6 +16,7 @@ import {
   setGeocodeCache,
   upsertLots,
   rematchLots,
+  rematchAllLots,
   recordSync,
   syncState,
   db,
@@ -68,7 +69,8 @@ export async function runPipeline(opts: { only?: LotSource; noNotify?: boolean; 
     }
   }
   // Дедлайн міг спливти без зміни процедури в джерелі.
-  await rematchLots();
+  const fullMatch=await rematchAllLots();
+  console.log(`[match] повний перерахунок: +${fullMatch.inserted}, -${fullMatch.deleted}, всього=${fullMatch.total}`);
   if (errors.length) throw new Error(errors.join('\n'));
 
   if (!opts.noGeocode) await geocodeMissing();

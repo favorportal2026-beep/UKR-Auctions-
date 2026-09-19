@@ -56,6 +56,27 @@ export async function rematchLots(ids?: string[]): Promise<{ inserted: number; d
   return data;
 }
 
+/** Повний rematch пакетами, щоб кожен RPC вкладався у statement_timeout Supabase. */
+export async function rematchAllLots(batchSize = 250): Promise<{ inserted: number; deleted: number; total: number }> {
+  const client=db();
+  let from=0;
+  let inserted=0;
+  let deleted=0;
+  let total=0;
+  while (true) {
+    const {data,error}=await client.from('lots').select('id').order('id').range(from,from+batchSize-1);
+    if (error) throw new Error(`rematchAllLots read: ${error.message}`);
+    if (!data?.length) break;
+    const result=await rematchLots(data.map(row=>row.id));
+    inserted+=result.inserted;
+    deleted+=result.deleted;
+    total=result.total;
+    from+=data.length;
+    if (data.length<batchSize) break;
+  }
+  return {inserted,deleted,total};
+}
+
 export async function recordSync(source: LotSource, fields: Record<string,unknown>): Promise<void> {
   const {error} = await db().from('sync_state').upsert({source,...fields},{onConflict:'source'});
   if (error) throw new Error(`recordSync: ${error.message}`);
