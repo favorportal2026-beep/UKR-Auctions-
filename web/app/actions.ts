@@ -7,9 +7,13 @@ import { money } from '@/lib/format';
 
 export async function loadCuration(id: string) {
   requireAccess();
-  const {data,error} = await db().from('lots').select('id,title,current_price,start_price,currency,region,image_url,lot_url,cadastral_number,lot_curation(status,note)').eq('id',id).single();
+  const client = db();
+  const [{data,error},{data:curation,error:curationError}] = await Promise.all([
+    client.from('lots').select('id,title,current_price,start_price,currency,region,image_url,lot_url,cadastral_number').eq('id',id).single(),
+    client.from('lot_curation').select('status,note').eq('lot_id',id).maybeSingle(),
+  ]);
   if (error) throw new Error(error.message);
-  const curation = data.lot_curation as unknown as {status:string|null;note:string|null}|null;
+  if (curationError) throw new Error(curationError.message);
   return {id:data.id,title:data.title ?? 'Без назви',priceLabel:money(data.current_price ?? data.start_price,data.currency ?? 'UAH'),
     region:data.region,image:data.image_url,url:data.lot_url,cadastral:data.cadastral_number,
     status:curation?.status ?? '',note:curation?.note ?? ''};

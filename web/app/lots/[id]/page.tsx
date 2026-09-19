@@ -20,15 +20,20 @@ function local(value:unknown):string {
 }
 export default async function LotDetail({params}:{params:{id:string}}) {
   if (!/^[a-f0-9-]{36}$/i.test(params.id)) notFound();
-  const {data,error} = await db().from('lots').select('*,lot_curation(status,note),matches(criteria(id,name))').eq('id',params.id).maybeSingle();
+  const client=db();
+  const [{data,error},{data:curation,error:curationError}] = await Promise.all([
+    client.from('lots').select('*,matches(criteria(id,name))').eq('id',params.id).maybeSingle(),
+    client.from('lot_curation').select('status,note').eq('lot_id',params.id).maybeSingle(),
+  ]);
   if (error) throw new Error(error.message);
+  if (curationError) throw new Error(curationError.message);
   if (!data) notFound();
-  const lot=data as Lot & {raw?:{documents?:{title?:unknown;url?:unknown}[]};lot_curation:{status:string|null;note:string|null}|null;
+  const lot=data as Lot & {raw?:{documents?:{title?:unknown;url?:unknown}[]};
     matches:{criteria:{id:string;name:string}|null}[]};
   const price=lot.current_price ?? lot.start_price;
   const open=lot.is_active && (!lot.bids_end || Date.parse(lot.bids_end)>Date.now());
   const detail={id:lot.id,title:lot.title ?? 'Без назви',priceLabel:money(price,lot.currency ?? 'UAH'),region:lot.region,
-    image:lot.image_url,url:lot.lot_url,cadastral:lot.cadastral_number,status:lot.lot_curation?.status ?? '',note:lot.lot_curation?.note ?? ''};
+    image:lot.image_url,url:lot.lot_url,cadastral:lot.cadastral_number,status:curation?.status ?? '',note:curation?.note ?? ''};
   const documents=(lot.raw?.documents ?? []).map(d=>({title:local(d.title),url:safeUrl(d.url)})).filter(d=>d.url);
   return <main className="lot-detail">
     <Link href="/">← Каталог лотів</Link>
@@ -36,7 +41,7 @@ export default async function LotDetail({params}:{params:{id:string}}) {
     <div className="badges"><span className="badge">{open?'Активний':'Архів'}</span>
       <span className="badge">{SOURCE_LABEL[lot.source]}</span><span className="badge">{ASSET_LABEL[lot.asset_type]}</span>
       {lot.subtype && <span className="badge">{SUBTYPE_LABEL[lot.subtype] ?? lot.subtype}</span>}
-      {lot.lot_curation?.status && <span className="badge">{STATUS_LABEL[lot.lot_curation.status]}</span>}
+      {curation?.status && <span className="badge">{STATUS_LABEL[curation.status]}</span>}
       {lot.hidden && <span className="badge">Прихований</span>}
     </div>
     <div className="detail-grid">
@@ -65,7 +70,7 @@ export default async function LotDetail({params}:{params:{id:string}}) {
           {safeUrl(lot.lot_url) && <a className="btn" href={lot.lot_url!} target="_blank" rel="noreferrer">Відкрити джерело ↗</a>}
           <form action={lot.hidden?unhideLot:hideLot}><input type="hidden" name="id" value={lot.id}/><button className="btn">{lot.hidden?'Повернути':'Приховати'}</button></form>
         </div>
-        <h2>Нотатки</h2><p className="detail-description">{lot.lot_curation?.note || 'Нотаток ще немає.'}</p>
+        <h2>Нотатки</h2><p className="detail-description">{curation?.note || 'Нотаток ще немає.'}</p>
         {!!lot.matches.length && <><h2>Збережені пошуки</h2><div className="matched">{lot.matches.map(m=>m.criteria && <span className="chip" key={m.criteria.id}>{m.criteria.name}</span>)}</div></>}
       </section>
     </div>
