@@ -5,8 +5,9 @@ import type { Lot } from '@/lib/types';
 import { ASSET_LABEL,SOURCE_LABEL,area,dateShort,money,discountLabel } from '@/lib/format';
 import { SUBTYPE_LABEL } from '@/lib/filters';
 import CurationButton from '../../components/CurationButton';
-import CurationDrawer,{STATUS_LABEL} from '../../components/CurationDrawer';
+import CurationDrawer from '../../components/CurationDrawer';
 import { hideLot,unhideLot } from '../../actions';
+import { STATUS_LABEL } from '@/lib/curation';
 
 export const dynamic = 'force-dynamic';
 function safeUrl(value:unknown):string|null {

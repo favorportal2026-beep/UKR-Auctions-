@@ -7,9 +7,10 @@ import { ASSET_LABEL, SOURCE_LABEL, area, dateShort, discountLabel, money } from
 import { applyLotFilters, applyLotSort, parseLotFilters, SORT_OPTIONS, SUBTYPE_LABEL, type SP } from '@/lib/filters';
 import LotFilterFields from './components/LotFilterFields';
 import ViewSwitcher from './components/ViewSwitcher';
-import CurationDrawer, { STATUS_LABEL } from './components/CurationDrawer';
+import CurationDrawer from './components/CurationDrawer';
 import CurationButton from './components/CurationButton';
 import { hideLot, rematchAll, unhideLot } from './actions';
+import { STATUS_LABEL } from '@/lib/curation';
 
 export const dynamic = 'force-dynamic';
 

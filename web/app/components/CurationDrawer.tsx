@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { loadCuration, saveCuration } from '../actions';
+import { STATUS_LABEL } from '@/lib/curation';
+
+export { STATUS_LABEL } from '@/lib/curation';
 
 export type CurationDetail = {
   id: string;
@@ -20,12 +23,6 @@ const STATUSES: { value: string; label: string }[] = [
   { value: 'shortlist', label: 'Шорт-ліст' },
   { value: 'bidding', label: 'Торгуюсь' },
 ];
-
-export const STATUS_LABEL: Record<string, string> = {
-  review: 'Розглянути',
-  shortlist: 'Шорт-ліст',
-  bidding: 'Торгуюсь',
-};
 
 // Відкриття панелі — подією (одна панель на сторінку; кнопки на картках шлють подію).
 export function openCuration(detail: CurationDetail | {id:string}) {
